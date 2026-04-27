@@ -60,11 +60,11 @@ npm run build
 ```text
 .mcp.json
 .claude/settings.json
-safe-read-write-mcp/dist/server.js
-safe-read-write-mcp/dist/safe-rw-guard.js
+.claude/mcp/gbk-safe-rw-mcp/dist/server.js
+.claude/mcp/gbk-safe-rw-mcp/dist/safe-rw-guard.js
 ```
 
-离线机器只需要已安装 Node.js，Claude Code 会通过 `node` 直接运行 `dist/server.js` 与 `dist/safe-rw-guard.js`。
+离线机器只需要已安装 Node.js，Claude Code 会通过 `node` 直接运行仓库内 `.claude/mcp/gbk-safe-rw-mcp/` 下的脚本。
 
 如果需要在离线机器重新构建源码，则必须提前准备 npm 依赖。可在联网机器上执行：
 
@@ -106,13 +106,13 @@ safe-read-write-mcp/releases/safe-read-write-mcp-v0.1.1/
 safe-read-write-mcp/releases/safe-read-write-mcp-v0.1.1.zip
 ```
 
-离线机器拿到 zip 后，解压到固定目录，再在目标仓库根目录执行包内的安装脚本：
+离线机器拿到 zip 后，解压到任意目录，再在目标仓库根目录执行包内的安装脚本：
 
 ```bash
 node D:/tools/safe-read-write-mcp-v0.1.1/install.mjs .
 ```
 
-安装脚本会自动写入或更新目标仓库的 `.mcp.json` 与 `.claude/settings.json`。
+安装脚本会把 MCP 运行文件复制到目标仓库内的 `.claude/mcp/gbk-safe-rw-mcp/`，并自动写入或更新目标仓库的 `.mcp.json` 与 `.claude/settings.json`。配置使用仓库相对路径，可以提交给团队共享。
 
 如果修改了 `src/` 下的源码，请重新执行：
 
@@ -127,7 +127,14 @@ npm run build
 - `.mcp.json`：声明项目级 MCP server。
 - `.claude/settings.json`：启用该 MCP server，并配置 Claude Code hook。
 
-注意：不要把项目级 MCP server 只写在 `.claude/settings.json` 的 `mcpServers` 中。当前 Claude Code 对项目级 MCP 的主读取位置是仓库根目录 `.mcp.json`；同时，stdio MCP 启动时不会保证以仓库根目录作为工作目录，因此服务脚本路径建议使用绝对路径。
+注意：不要把项目级 MCP server 只写在 `.claude/settings.json` 的 `mcpServers` 中。当前 Claude Code 对项目级 MCP 的主读取位置是仓库根目录 `.mcp.json`。
+
+团队共享时建议把 MCP 运行文件放进仓库内的 `.claude/mcp/gbk-safe-rw-mcp/`，并使用相对路径配置。团队成员应从仓库根目录启动 Claude Code：
+
+```bash
+cd your-repo
+claude
+```
 
 `.mcp.json`：
 
@@ -138,7 +145,7 @@ npm run build
       "type": "stdio",
       "command": "node",
       "args": [
-        "I:/claude-code-source-code/safe-read-write-mcp/dist/server.js"
+        ".claude/mcp/gbk-safe-rw-mcp/dist/server.js"
       ],
       "env": {
         "SAFE_RW_EXTS": ".c,.cc,.cpp,.cxx,.h,.hh,.hpp,.hxx,.inl,.sql"
@@ -163,7 +170,7 @@ npm run build
         "hooks": [
           {
             "type": "command",
-            "command": "node \"I:/claude-code-source-code/safe-read-write-mcp/dist/safe-rw-guard.js\"",
+            "command": "node .claude/mcp/gbk-safe-rw-mcp/dist/safe-rw-guard.js",
             "timeout": 5,
             "statusMessage": "检查 GBK 安全读写策略"
           }
@@ -174,7 +181,7 @@ npm run build
         "hooks": [
           {
             "type": "command",
-            "command": "node \"I:/claude-code-source-code/safe-read-write-mcp/dist/safe-rw-guard.js\"",
+            "command": "node .claude/mcp/gbk-safe-rw-mcp/dist/safe-rw-guard.js",
             "timeout": 5,
             "statusMessage": "规范化 safe read/write/edit 路径"
           }
