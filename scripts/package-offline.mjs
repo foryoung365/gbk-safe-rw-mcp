@@ -12,7 +12,7 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const PACKAGE_NAME = 'safe-read-write-mcp'
-const SAFE_EXTS = '.c,.cc,.cpp,.cxx,.h,.hh,.hpp,.hxx,.inl,.sql'
+const SAFE_EXTS = '.c,.cc,.cpp,.cxx,.h,.hh,.hpp,.hxx,.inl,.sql,.proto'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const packageJsonPath = path.join(root, 'package.json')
@@ -40,13 +40,10 @@ const archivePath = path.join(releasesDir, `${releaseName}.zip`)
 
 await rm(releaseDir, { recursive: true, force: true })
 await rm(archivePath, { force: true })
-await mkdir(path.join(releaseDir, 'dist'), { recursive: true })
-
-await cp(path.join(root, 'dist', 'server.js'), path.join(releaseDir, 'dist', 'server.js'))
-await cp(
-  path.join(root, 'dist', 'safe-rw-guard.js'),
-  path.join(releaseDir, 'dist', 'safe-rw-guard.js'),
-)
+await mkdir(releaseDir, { recursive: true })
+await cp(path.join(root, 'dist'), path.join(releaseDir, 'dist'), {
+  recursive: true,
+})
 await writeFile(path.join(releaseDir, 'VERSION'), `${nextVersion}\n`, 'utf8')
 await writeFile(path.join(releaseDir, 'install.mjs'), installScript(), 'utf8')
 await writeFile(path.join(releaseDir, 'README.md'), releaseReadme(nextVersion), 'utf8')
@@ -90,7 +87,7 @@ import { cp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const SAFE_EXTS = process.env.SAFE_RW_EXTS || '.c,.cc,.cpp,.cxx,.h,.hh,.hpp,.hxx,.inl,.sql'
+const SAFE_EXTS = process.env.SAFE_RW_EXTS || '.c,.cc,.cpp,.cxx,.h,.hh,.hpp,.hxx,.inl,.sql,.proto'
 const packageDir = path.dirname(fileURLToPath(import.meta.url))
 const targetRepo = path.resolve(process.argv[2] || process.cwd())
 const vendorRelativeDir = '.claude/mcp/gbk-safe-rw-mcp'
@@ -108,9 +105,8 @@ console.log('MCP server path in .mcp.json: ' + serverPath)
 console.log('Restart Claude Code, then check /mcp for safe_rw.')
 
 async function installVendorFiles() {
-  await mkdir(path.join(vendorDir, 'dist'), { recursive: true })
-  await cp(path.join(packageDir, 'dist', 'server.js'), path.join(vendorDir, 'dist', 'server.js'))
-  await cp(path.join(packageDir, 'dist', 'safe-rw-guard.js'), path.join(vendorDir, 'dist', 'safe-rw-guard.js'))
+  await mkdir(vendorDir, { recursive: true })
+  await cp(path.join(packageDir, 'dist'), path.join(vendorDir, 'dist'), { recursive: true })
   await cp(path.join(packageDir, 'README.md'), path.join(vendorDir, 'README.md'))
   await cp(path.join(packageDir, 'VERSION'), path.join(vendorDir, 'VERSION'))
 }
@@ -149,7 +145,7 @@ async function writeClaudeSettings() {
   settings.hooks.PreToolUse = [
     ...existingPreToolUse.filter(item => !containsSafeRwGuard(item)),
     {
-      matcher: 'Read|Write|Edit',
+      matcher: 'Read|Write|Edit|Grep|Search',
       hooks: [
         {
           type: 'command',
@@ -161,13 +157,13 @@ async function writeClaudeSettings() {
     },
     {
       matcher:
-        'mcp__safe_rw__safe_read|mcp__safe_rw__safe_write|mcp__safe_rw__safe_edit',
+        'mcp__safe_rw__safe_read|mcp__safe_rw__safe_write|mcp__safe_rw__safe_edit|mcp__safe_rw__safe_search',
       hooks: [
         {
           type: 'command',
           command: 'node ' + guardPath,
           timeout: 5,
-          statusMessage: '规范化 safe read/write/edit 路径',
+          statusMessage: '规范化 safe read/write/edit/search 路径',
         },
       ],
     },
@@ -204,11 +200,23 @@ function toPortablePath(value) {
 }
 
 function releaseReadme(version) {
-  return `# Safe Read/Write/Edit MCP 离线安装包
+  return `# Safe Read/Write/Edit/Search MCP 离线安装包
 
 版本：${version}
 
-本发布包用于在 Claude Code 中安全处理 GBK 编码的遗留 C/C++ 与 SQL 文本文件。运行时不需要安装 npm 依赖，也不需要携带 \`node_modules\`；离线机器只需要安装 Node.js。
+本发布包用于在 Claude Code 中安全处理 GBK 编码的遗留 C/C++、SQL 与 Proto 文本文件。运行时不需要安装 npm 依赖，也不需要携带 \`node_modules\`；离线机器只需要安装 Node.js。
+
+\`safe_search\` 会调用真实 \`ripgrep\`，以尽量复用 Claude Code 内置 Search/Grep 的正则、glob、上下文和计数语义。当前发布包已内置 Windows x64 版 \`rg.exe\`：
+
+\`\`\`text
+dist/vendor/ripgrep/win32/x64/rg.exe
+\`\`\`
+
+在 Windows x64 离线环境中，不需要额外安装 \`ripgrep\`。其他平台运行时需要满足以下任一条件：
+
+- 机器上已安装 \`rg\`，并且 \`rg\` 在 \`PATH\` 中。
+- 发布包内包含 \`dist/vendor/ripgrep/<platform>/<arch>/rg\` 或 \`rg.exe\`。
+- 启动 Claude Code 前设置环境变量 \`SAFE_RW_RG_PATH\` 指向可执行的 \`rg\`。
 
 ## 包内容
 
@@ -272,6 +280,7 @@ Claude Code 中会暴露以下 MCP 工具：
 mcp__safe_rw__safe_read
 mcp__safe_rw__safe_write
 mcp__safe_rw__safe_edit
+mcp__safe_rw__safe_search
 \`\`\`
 
 ## 默认受保护后缀
@@ -284,9 +293,11 @@ ${SAFE_EXTS}
 
 ## 注意事项
 
-- 受保护后缀文件必须使用 safe 工具，不要使用内置 \`Read\` / \`Write\` / \`Edit\`。
+- 受保护后缀文件必须使用 safe 读写编辑工具，不要使用内置 \`Read\` / \`Write\` / \`Edit\`。
+- 内置 Search/Grep 被完全禁用；所有内容搜索都必须使用 \`safe_search\`。
 - \`safe_write\` 是完整覆盖写入；已有文件写入前必须先完整 \`safe_read\`。
 - \`safe_edit\` 是精确字符串替换；已有非空文件编辑前必须先 \`safe_read\`，但可以是局部读取。
+- \`safe_search\` 会搜索全仓库文件；受保护后缀会先将 GBK/UTF-8 文件解码为 UTF-8 临时镜像，其他文件按原样进入镜像，再调用 \`ripgrep\` 执行搜索。
 - 如果需要升级 MCP 版本，请用新发布包重新执行 \`install.mjs\`，然后提交更新后的 \`.claude/mcp/gbk-safe-rw-mcp/\`、\`.mcp.json\` 与 \`.claude/settings.json\`。
 `
 }

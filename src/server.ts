@@ -16,6 +16,7 @@ import {
   markRead,
   setFullReadState,
 } from './file-state.js'
+import { safeSearch, type SafeSearchArgs } from './safe-search.js'
 import { decodeTextBuffer, encodeText } from './text-codec.js'
 
 declare const SAFE_RW_VERSION: string | undefined
@@ -40,6 +41,8 @@ type SafeEditArgs = {
   new_string: string
   replace_all?: boolean
 }
+
+type SafeSearchOutputMode = SafeSearchArgs['output_mode']
 
 const SAFE_READ_TOOL: Tool = {
   name: 'safe_read',
@@ -133,6 +136,92 @@ const SAFE_EDIT_TOOL: Tool = {
   },
 }
 
+const SAFE_SEARCH_TOOL: Tool = {
+  name: 'safe_search',
+  description:
+    'Search repository files with a ripgrep-like interface. GBK-safe extensions are decoded to UTF-8 temporary mirrors before matching. Use this instead of built-in Search/Grep.',
+  inputSchema: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      pattern: {
+        type: 'string',
+        description: 'The regular expression pattern to search for in file contents.',
+      },
+      path: {
+        type: 'string',
+        description:
+          'File or directory to search in. Defaults to current working directory. Relative paths are normalized by the Claude Code hook before this tool runs.',
+      },
+      glob: {
+        type: 'string',
+        description:
+          'Glob pattern to filter files, e.g. "*.cpp", "*.{h,hpp}", "*.proto", or "*.md".',
+      },
+      output_mode: {
+        type: 'string',
+        enum: ['content', 'files_with_matches', 'count'],
+        description:
+          'Output mode: "content" shows matching lines, "files_with_matches" shows file paths, "count" shows match counts. Defaults to "files_with_matches".',
+      },
+      '-B': {
+        type: 'number',
+        description:
+          'Number of lines to show before each match. Requires output_mode: "content".',
+      },
+      '-A': {
+        type: 'number',
+        description:
+          'Number of lines to show after each match. Requires output_mode: "content".',
+      },
+      '-C': {
+        type: 'number',
+        description: 'Alias for context.',
+      },
+      context: {
+        type: 'number',
+        description:
+          'Number of lines to show before and after each match. Requires output_mode: "content".',
+      },
+      '-n': {
+        type: 'boolean',
+        description:
+          'Show line numbers in output. Requires output_mode: "content". Defaults to true.',
+      },
+      '-i': {
+        type: 'boolean',
+        description: 'Case insensitive search.',
+      },
+      type: {
+        type: 'string',
+        description:
+          'File type to search, equivalent to rg --type. Safe aliases include c, cpp, h, sql, proto.',
+      },
+      head_limit: {
+        type: 'number',
+        description:
+          'Limit output to first N lines/entries. Defaults to 250 when unspecified. Pass 0 for unlimited.',
+      },
+      offset: {
+        type: 'number',
+        description:
+          'Skip first N lines/entries before applying head_limit. Defaults to 0.',
+      },
+      multiline: {
+        type: 'boolean',
+        description:
+          'Enable multiline mode where . matches newlines and patterns can span lines. Defaults to false.',
+      },
+    },
+    required: ['pattern'],
+  },
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    openWorldHint: false,
+  },
+}
+
 const server = new Server(
   {
     name: 'safe-read-write-mcp',
@@ -146,7 +235,7 @@ const server = new Server(
 )
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: [SAFE_READ_TOOL, SAFE_WRITE_TOOL, SAFE_EDIT_TOOL],
+  tools: [SAFE_READ_TOOL, SAFE_WRITE_TOOL, SAFE_EDIT_TOOL, SAFE_SEARCH_TOOL],
 }))
 
 server.setRequestHandler(
@@ -160,6 +249,8 @@ server.setRequestHandler(
           return textResult(await safeWrite(parseSafeWriteArgs(params.arguments)))
         case 'safe_edit':
           return textResult(await safeEdit(parseSafeEditArgs(params.arguments)))
+        case 'safe_search':
+          return textResult(await safeSearch(parseSafeSearchArgs(params.arguments)))
         default:
           throw new Error(`Unknown tool: ${params.name}`)
       }
@@ -454,6 +545,102 @@ function parseSafeEditArgs(value: unknown): SafeEditArgs {
     new_string: input.new_string,
     replace_all: input.replace_all,
   }
+}
+
+function parseSafeSearchArgs(value: unknown): SafeSearchArgs {
+  const input = assertObject(value)
+  if (typeof input.pattern !== 'string') {
+    throw new Error('safe_search requires string pattern.')
+  }
+
+  const args: SafeSearchArgs = { pattern: input.pattern }
+  if (input.path !== undefined) {
+    if (typeof input.path !== 'string' || input.path.length === 0) {
+      throw new Error('safe_search path must be a non-empty string when provided.')
+    }
+    args.path = input.path
+  }
+  if (input.glob !== undefined) {
+    if (typeof input.glob !== 'string' || input.glob.length === 0) {
+      throw new Error('safe_search glob must be a non-empty string when provided.')
+    }
+    args.glob = input.glob
+  }
+  if (input.output_mode !== undefined) {
+    if (!isSafeSearchOutputMode(input.output_mode)) {
+      throw new Error(
+        'safe_search output_mode must be one of: content, files_with_matches, count.',
+      )
+    }
+    args.output_mode = input.output_mode
+  }
+
+  parseOptionalNonnegativeNumber(input, args, '-B')
+  parseOptionalNonnegativeNumber(input, args, '-A')
+  parseOptionalNonnegativeNumber(input, args, '-C')
+  parseOptionalNonnegativeNumber(input, args, 'context')
+  parseOptionalNonnegativeNumber(input, args, 'head_limit')
+  parseOptionalNonnegativeNumber(input, args, 'offset')
+  parseOptionalBoolean(input, args, '-n')
+  parseOptionalBoolean(input, args, '-i')
+  parseOptionalBoolean(input, args, 'multiline')
+
+  if (input.type !== undefined) {
+    if (typeof input.type !== 'string' || input.type.length === 0) {
+      throw new Error('safe_search type must be a non-empty string when provided.')
+    }
+    args.type = input.type
+  }
+
+  return args
+}
+
+function isSafeSearchOutputMode(value: unknown): value is SafeSearchOutputMode {
+  return (
+    value === 'content' ||
+    value === 'files_with_matches' ||
+    value === 'count'
+  )
+}
+
+function parseOptionalNonnegativeNumber(
+  input: Record<string, unknown>,
+  output: SafeSearchArgs,
+  key: '-B' | '-A' | '-C' | 'context' | 'head_limit' | 'offset',
+): void {
+  const value = coerceSemanticNumber(input[key])
+  if (value === undefined) return
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    throw new Error(`safe_search ${key} must be a nonnegative number when provided.`)
+  }
+  output[key] = value
+}
+
+function parseOptionalBoolean(
+  input: Record<string, unknown>,
+  output: SafeSearchArgs,
+  key: '-n' | '-i' | 'multiline',
+): void {
+  const value = coerceSemanticBoolean(input[key])
+  if (value === undefined) return
+  if (typeof value !== 'boolean') {
+    throw new Error(`safe_search ${key} must be a boolean when provided.`)
+  }
+  output[key] = value
+}
+
+function coerceSemanticNumber(value: unknown): unknown {
+  if (typeof value === 'string' && /^-?\d+(\.\d+)?$/.test(value)) {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return value
+}
+
+function coerceSemanticBoolean(value: unknown): unknown {
+  if (value === 'true') return true
+  if (value === 'false') return false
+  return value
 }
 
 function assertObject(value: unknown): Record<string, unknown> {

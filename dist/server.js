@@ -3229,8 +3229,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path3) {
-      let input = path3;
+    function removeDotSegments(path4) {
+      let input = path4;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3429,8 +3429,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path3, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path3 && path3 !== "/" ? path3 : void 0;
+        const [path4, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path4 && path4 !== "/" ? path4 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -6792,12 +6792,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs2, exportName) {
+    function addFormats(ajv, list, fs3, exportName) {
       var _a2;
       var _b;
       (_a2 = (_b = ajv.opts.code).formats) !== null && _a2 !== void 0 ? _a2 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs2[f]);
+        ajv.addFormat(f, fs3[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -10588,8 +10588,8 @@ var require_lib = __commonJS({
 });
 
 // src/server.ts
-import fs from "node:fs/promises";
-import path2 from "node:path";
+import fs2 from "node:fs/promises";
+import path3 from "node:path";
 
 // node_modules/zod/v3/helpers/util.js
 var util;
@@ -10950,8 +10950,8 @@ function getErrorMap() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path3, errorMaps, issueData } = params;
-  const fullPath = [...path3, ...issueData.path || []];
+  const { data, path: path4, errorMaps, issueData } = params;
+  const fullPath = [...path4, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -11066,11 +11066,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path3, key) {
+  constructor(parent, value, path4, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path3;
+    this._path = path4;
     this._key = key;
   }
   get path() {
@@ -14714,10 +14714,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path3) {
-  if (!path3)
+function getElementAtPath(obj, path4) {
+  if (!path4)
     return obj;
-  return path3.reduce((acc, key) => acc?.[key], obj);
+  return path4.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -15100,11 +15100,11 @@ function aborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path3, issues) {
+function prefixIssues(path4, issues) {
   return issues.map((iss) => {
     var _a2;
     (_a2 = iss).path ?? (_a2.path = []);
-    iss.path.unshift(path3);
+    iss.path.unshift(path4);
     return iss;
   });
 }
@@ -24631,7 +24631,8 @@ var DEFAULT_SAFE_EXTS = [
   ".hpp",
   ".hxx",
   ".inl",
-  ".sql"
+  ".sql",
+  ".proto"
 ];
 function parseSafeExts(raw = process.env.SAFE_RW_EXTS) {
   const values = raw?.split(/[,\s;]+/).map((item) => item.trim()).filter(Boolean) ?? DEFAULT_SAFE_EXTS;
@@ -24670,6 +24671,14 @@ function setFullReadState(realPath, state) {
     fullRead: state
   });
 }
+
+// src/safe-search.ts
+import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path2 from "node:path";
+import { fileURLToPath } from "node:url";
 
 // src/text-codec.ts
 var import_iconv_lite = __toESM(require_lib(), 1);
@@ -24777,8 +24786,441 @@ function encodeText(content, encoding, lineEndings, hasUtf8Bom2) {
   return encoded;
 }
 
+// src/safe-search.ts
+var VCS_DIRECTORIES_TO_EXCLUDE = [
+  ".git",
+  ".svn",
+  ".hg",
+  ".bzr",
+  ".jj",
+  ".sl"
+];
+var VCS_DIRECTORY_SET = new Set(VCS_DIRECTORIES_TO_EXCLUDE);
+var IGNORE_FILENAMES = /* @__PURE__ */ new Set([".gitignore", ".ignore", ".rgignore"]);
+var DEFAULT_HEAD_LIMIT = 250;
+var MAX_BUFFER_SIZE = 2e7;
+var RG_TIMEOUT_MS = 2e4;
+var SAFE_TYPE_ADDS = {
+  c: ["*.c", "*.h"],
+  cc: ["*.cc", "*.cpp", "*.cxx", "*.h", "*.hh", "*.hpp", "*.hxx", "*.inl"],
+  cpp: ["*.cc", "*.cpp", "*.cxx", "*.h", "*.hh", "*.hpp", "*.hxx", "*.inl"],
+  h: ["*.h", "*.hh", "*.hpp", "*.hxx"],
+  hpp: ["*.hh", "*.hpp", "*.hxx"],
+  sql: ["*.sql"],
+  proto: ["*.proto"],
+  protobuf: ["*.proto"]
+};
+async function safeSearch(args) {
+  const outputMode = args.output_mode ?? "files_with_matches";
+  const workspaceRoot = path2.resolve(process.cwd());
+  const targetPath = path2.resolve(args.path ?? workspaceRoot);
+  const safeExts = parseSafeExts();
+  const tempDir = await fs.mkdtemp(path2.join(os.tmpdir(), "safe-rw-search-"));
+  try {
+    const mirror = await createUtf8Mirror(workspaceRoot, targetPath, safeExts, tempDir);
+    if (mirror.files.length === 0) {
+      return formatEmptyResult(outputMode);
+    }
+    const rgArgs = buildRipgrepArgs(args, outputMode);
+    const rawResults = await runRipgrep(rgArgs, mirror.target);
+    if (outputMode === "content") {
+      return formatContentResult(rawResults, mirror.files, args);
+    }
+    if (outputMode === "count") {
+      return formatCountResult(rawResults, mirror.files, args);
+    }
+    return formatFilesWithMatchesResult(rawResults, mirror.files, args);
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => void 0);
+  }
+}
+async function createUtf8Mirror(workspaceRoot, targetPath, safeExts, tempDir) {
+  const rootStat = await fs.stat(workspaceRoot);
+  if (!rootStat.isDirectory()) {
+    throw new Error(`Current working directory is not a directory: ${workspaceRoot}`);
+  }
+  const targetStat = await fs.stat(targetPath).catch((error2) => {
+    if (isNotFoundError(error2)) {
+      throw new Error(`Path does not exist: ${targetPath}`);
+    }
+    throw error2;
+  });
+  const mirrorRoot = path2.join(tempDir, "mirror");
+  await fs.mkdir(mirrorRoot, { recursive: true });
+  await fs.mkdir(path2.join(mirrorRoot, ".git"), { recursive: true });
+  const targetDir = targetStat.isDirectory() ? targetPath : path2.dirname(targetPath);
+  await copyAncestorIgnoreFiles(workspaceRoot, targetDir, mirrorRoot);
+  const files = [];
+  if (targetStat.isFile()) {
+    files.push(await mirrorFile(workspaceRoot, mirrorRoot, targetPath, targetStat.mtimeMs, safeExts));
+  } else if (targetStat.isDirectory()) {
+    await mirrorDirectory(workspaceRoot, mirrorRoot, targetPath, safeExts, files);
+  } else {
+    throw new Error(`Path is not a file or directory: ${targetPath}`);
+  }
+  return {
+    root: mirrorRoot,
+    target: toMirrorPath(workspaceRoot, mirrorRoot, targetPath),
+    files
+  };
+}
+async function mirrorDirectory(workspaceRoot, mirrorRoot, dir, safeExts, files) {
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const absolutePath = path2.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (VCS_DIRECTORY_SET.has(entry.name)) continue;
+      await mirrorDirectory(workspaceRoot, mirrorRoot, absolutePath, safeExts, files);
+      continue;
+    }
+    if (!entry.isFile()) continue;
+    if (IGNORE_FILENAMES.has(entry.name)) {
+      const stat2 = await fs.stat(absolutePath);
+      files.push(await mirrorRawFile(workspaceRoot, mirrorRoot, absolutePath, stat2.mtimeMs));
+      continue;
+    }
+    const stat = await fs.stat(absolutePath);
+    files.push(await mirrorFile(workspaceRoot, mirrorRoot, absolutePath, stat.mtimeMs, safeExts));
+  }
+}
+async function mirrorFile(workspaceRoot, mirrorRoot, originalAbsolute, mtimeMs, safeExts) {
+  if (!isSafeFile(originalAbsolute, safeExts)) {
+    return mirrorRawFile(workspaceRoot, mirrorRoot, originalAbsolute, mtimeMs);
+  }
+  try {
+    return await mirrorTextFile(workspaceRoot, mirrorRoot, originalAbsolute, mtimeMs);
+  } catch {
+    return mirrorRawFile(workspaceRoot, mirrorRoot, originalAbsolute, mtimeMs);
+  }
+}
+async function mirrorTextFile(workspaceRoot, mirrorRoot, originalAbsolute, mtimeMs) {
+  const decoded = decodeTextBuffer(await fs.readFile(originalAbsolute));
+  const mirrorAbsolute = toMirrorPath(workspaceRoot, mirrorRoot, originalAbsolute);
+  await fs.mkdir(path2.dirname(mirrorAbsolute), { recursive: true });
+  await fs.writeFile(mirrorAbsolute, decoded.content, "utf8");
+  return {
+    originalAbsolute,
+    originalRelative: toPortableRelativePath(originalAbsolute, workspaceRoot),
+    mirrorAbsolute,
+    mirrorPortableAbsolute: toPortablePath(mirrorAbsolute),
+    mtimeMs
+  };
+}
+async function copyAncestorIgnoreFiles(workspaceRoot, targetDir, mirrorRoot) {
+  const relative = path2.relative(workspaceRoot, targetDir);
+  if (relative.startsWith("..") || path2.isAbsolute(relative)) return;
+  const segments = relative === "" ? [] : relative.split(path2.sep);
+  let current = workspaceRoot;
+  await copyIgnoreFilesInDirectory(workspaceRoot, mirrorRoot, current);
+  for (const segment of segments) {
+    current = path2.join(current, segment);
+    await copyIgnoreFilesInDirectory(workspaceRoot, mirrorRoot, current);
+  }
+}
+async function copyIgnoreFilesInDirectory(workspaceRoot, mirrorRoot, dir) {
+  for (const name of IGNORE_FILENAMES) {
+    const filePath = path2.join(dir, name);
+    try {
+      const stat = await fs.stat(filePath);
+      if (stat.isFile()) await copyRawFile(workspaceRoot, mirrorRoot, filePath);
+    } catch (error2) {
+      if (!isNotFoundError(error2)) throw error2;
+    }
+  }
+}
+async function copyRawFile(workspaceRoot, mirrorRoot, originalAbsolute) {
+  const mirrorAbsolute = toMirrorPath(workspaceRoot, mirrorRoot, originalAbsolute);
+  await fs.mkdir(path2.dirname(mirrorAbsolute), { recursive: true });
+  await fs.copyFile(originalAbsolute, mirrorAbsolute);
+}
+async function mirrorRawFile(workspaceRoot, mirrorRoot, originalAbsolute, mtimeMs) {
+  await copyRawFile(workspaceRoot, mirrorRoot, originalAbsolute);
+  const mirrorAbsolute = toMirrorPath(workspaceRoot, mirrorRoot, originalAbsolute);
+  return {
+    originalAbsolute,
+    originalRelative: toPortableRelativePath(originalAbsolute, workspaceRoot),
+    mirrorAbsolute,
+    mirrorPortableAbsolute: toPortablePath(mirrorAbsolute),
+    mtimeMs
+  };
+}
+function buildRipgrepArgs(args, outputMode) {
+  const rgArgs = ["--hidden"];
+  for (const dir of VCS_DIRECTORIES_TO_EXCLUDE) {
+    rgArgs.push("--glob", `!${dir}`);
+  }
+  rgArgs.push("--max-columns", "500");
+  for (const [type, globs] of Object.entries(SAFE_TYPE_ADDS)) {
+    for (const glob of globs) {
+      rgArgs.push("--type-add", `${type}:${glob}`);
+    }
+  }
+  if (args.multiline) {
+    rgArgs.push("-U", "--multiline-dotall");
+  }
+  if (args["-i"]) {
+    rgArgs.push("-i");
+  }
+  if (outputMode === "files_with_matches") {
+    rgArgs.push("-l");
+  } else if (outputMode === "count") {
+    rgArgs.push("-c");
+  }
+  if ((args["-n"] ?? true) && outputMode === "content") {
+    rgArgs.push("-n");
+  }
+  if (outputMode === "content") {
+    if (args.context !== void 0) {
+      rgArgs.push("-C", String(args.context));
+    } else if (args["-C"] !== void 0) {
+      rgArgs.push("-C", String(args["-C"]));
+    } else {
+      if (args["-B"] !== void 0) rgArgs.push("-B", String(args["-B"]));
+      if (args["-A"] !== void 0) rgArgs.push("-A", String(args["-A"]));
+    }
+  }
+  if (args.pattern.startsWith("-")) {
+    rgArgs.push("-e", args.pattern);
+  } else {
+    rgArgs.push(args.pattern);
+  }
+  if (args.type) {
+    rgArgs.push("--type", args.type === "c++" ? "cpp" : args.type);
+  }
+  if (args.glob) {
+    for (const globPattern of splitGlobPatterns(args.glob)) {
+      rgArgs.push("--glob", globPattern);
+    }
+  }
+  return rgArgs;
+}
+async function runRipgrep(args, target) {
+  const { command, args: baseArgs } = await resolveRipgrepCommand();
+  const fullArgs = [...baseArgs, ...args, target];
+  return new Promise((resolve, reject) => {
+    execFile(
+      command,
+      fullArgs,
+      {
+        maxBuffer: MAX_BUFFER_SIZE,
+        timeout: RG_TIMEOUT_MS,
+        windowsHide: true
+      },
+      (error2, stdout, stderr) => {
+        const output = splitRipgrepOutput(stdout);
+        if (!error2) {
+          resolve(output);
+          return;
+        }
+        const code = error2.code;
+        if (code === 1) {
+          resolve([]);
+          return;
+        }
+        if (output.length > 0 && code !== 2) {
+          resolve(output);
+          return;
+        }
+        const detail = stderr.trim() || error2.message;
+        reject(new Error(`ripgrep failed: ${detail}`));
+      }
+    );
+  });
+}
+async function resolveRipgrepCommand() {
+  const configured = process.env.SAFE_RW_RG_PATH;
+  if (configured) {
+    await assertExecutable(configured);
+    return {
+      command: configured,
+      args: parseExtraRipgrepArgs(process.env.SAFE_RW_RG_ARGS)
+    };
+  }
+  const bundled = bundledRipgrepPath();
+  if (bundled) return { command: bundled, args: [] };
+  return { command: "rg", args: [] };
+}
+function parseExtraRipgrepArgs(raw) {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) {
+      return parsed;
+    }
+  } catch {
+  }
+  return raw.split(/\s+/).filter(Boolean);
+}
+function bundledRipgrepPath() {
+  const platform = process.platform === "win32" ? "win32" : process.platform === "darwin" ? "darwin" : "linux";
+  const executable = process.platform === "win32" ? "rg.exe" : "rg";
+  const candidate = path2.resolve(
+    path2.dirname(fileURLToPath(import.meta.url)),
+    "vendor",
+    "ripgrep",
+    platform,
+    process.arch,
+    executable
+  );
+  return fileExistsSync(candidate) ? candidate : null;
+}
+async function assertExecutable(filePath) {
+  try {
+    await fs.access(filePath);
+  } catch {
+    throw new Error(`SAFE_RW_RG_PATH does not exist or is not accessible: ${filePath}`);
+  }
+}
+function formatContentResult(rawResults, files, args) {
+  const { items, appliedLimit } = applyHeadLimit(
+    rawResults,
+    args.head_limit,
+    args.offset ?? 0
+  );
+  const finalLines = items.map((line) => mapRipgrepLine(line, files));
+  const limitInfo = formatLimitInfo(appliedLimit, args.offset);
+  const resultContent = finalLines.join("\n") || "No matches found";
+  return limitInfo ? `${resultContent}
+
+[Showing results with pagination = ${limitInfo}]` : resultContent;
+}
+function formatCountResult(rawResults, files, args) {
+  const { items, appliedLimit } = applyHeadLimit(
+    rawResults,
+    args.head_limit,
+    args.offset ?? 0
+  );
+  const finalCountLines = items.map((line) => mapRipgrepLine(line, files));
+  let totalMatches = 0;
+  let fileCount = 0;
+  for (const line of finalCountLines) {
+    const colonIndex = line.lastIndexOf(":");
+    if (colonIndex <= 0) continue;
+    const count = Number.parseInt(line.substring(colonIndex + 1), 10);
+    if (!Number.isNaN(count)) {
+      totalMatches += count;
+      fileCount += 1;
+    }
+  }
+  const limitInfo = formatLimitInfo(appliedLimit, args.offset);
+  const rawContent = finalCountLines.join("\n") || "No matches found";
+  const summary = `
+
+Found ${totalMatches} total ${totalMatches === 1 ? "occurrence" : "occurrences"} across ${fileCount} ${fileCount === 1 ? "file" : "files"}.${limitInfo ? ` with pagination = ${limitInfo}` : ""}`;
+  return rawContent + summary;
+}
+function formatFilesWithMatchesResult(rawResults, files, args) {
+  const matched = rawResults.map((line) => findFileForRipgrepPath(line, files)).filter((file2) => file2 !== void 0);
+  const uniqueByPath = /* @__PURE__ */ new Map();
+  for (const file2 of matched) {
+    uniqueByPath.set(file2.mirrorAbsolute, file2);
+  }
+  const sorted = [...uniqueByPath.values()].sort((a, b) => {
+    const timeComparison = b.mtimeMs - a.mtimeMs;
+    return timeComparison === 0 ? a.originalRelative.localeCompare(b.originalRelative) : timeComparison;
+  }).map((file2) => file2.originalRelative);
+  const { items, appliedLimit } = applyHeadLimit(
+    sorted,
+    args.head_limit,
+    args.offset ?? 0
+  );
+  if (items.length === 0) return "No files found";
+  const limitInfo = formatLimitInfo(appliedLimit, args.offset);
+  return `Found ${items.length} ${items.length === 1 ? "file" : "files"}${limitInfo ? ` ${limitInfo}` : ""}
+${items.join("\n")}`;
+}
+function formatEmptyResult(outputMode) {
+  if (outputMode === "files_with_matches") return "No files found";
+  if (outputMode === "count") {
+    return "No matches found\n\nFound 0 total occurrences across 0 files.";
+  }
+  return "No matches found";
+}
+function mapRipgrepLine(line, files) {
+  const file2 = findFileForRipgrepPath(line, files);
+  if (!file2) return line;
+  if (line === file2.mirrorAbsolute || line === file2.mirrorPortableAbsolute) {
+    return file2.originalRelative;
+  }
+  if (line.startsWith(`${file2.mirrorAbsolute}:`)) {
+    return `${file2.originalRelative}${line.slice(file2.mirrorAbsolute.length)}`;
+  }
+  if (line.startsWith(`${file2.mirrorAbsolute}-`)) {
+    return `${file2.originalRelative}${line.slice(file2.mirrorAbsolute.length)}`;
+  }
+  if (line.startsWith(`${file2.mirrorPortableAbsolute}:`)) {
+    return `${file2.originalRelative}${line.slice(file2.mirrorPortableAbsolute.length)}`;
+  }
+  if (line.startsWith(`${file2.mirrorPortableAbsolute}-`)) {
+    return `${file2.originalRelative}${line.slice(file2.mirrorPortableAbsolute.length)}`;
+  }
+  return line;
+}
+function findFileForRipgrepPath(line, files) {
+  return files.find(
+    (file2) => line === file2.mirrorAbsolute || line === file2.mirrorPortableAbsolute || line.startsWith(`${file2.mirrorAbsolute}:`) || line.startsWith(`${file2.mirrorAbsolute}-`) || line.startsWith(`${file2.mirrorPortableAbsolute}:`) || line.startsWith(`${file2.mirrorPortableAbsolute}-`)
+  );
+}
+function applyHeadLimit(items, limit, offset) {
+  if (limit === 0) {
+    return { items: items.slice(offset), appliedLimit: void 0 };
+  }
+  const effectiveLimit = limit ?? DEFAULT_HEAD_LIMIT;
+  return {
+    items: items.slice(offset, offset + effectiveLimit),
+    appliedLimit: items.length - offset > effectiveLimit ? effectiveLimit : void 0
+  };
+}
+function formatLimitInfo(appliedLimit, offset) {
+  const parts = [];
+  if (appliedLimit !== void 0) parts.push(`limit: ${appliedLimit}`);
+  if (offset) parts.push(`offset: ${offset}`);
+  return parts.join(", ");
+}
+function splitRipgrepOutput(stdout) {
+  return stdout.trim().split("\n").map((line) => line.replace(/\r$/, "")).filter(Boolean);
+}
+function splitGlobPatterns(glob) {
+  const patterns = [];
+  for (const rawPattern of glob.split(/\s+/)) {
+    if (!rawPattern) continue;
+    if (rawPattern.includes("{") && rawPattern.includes("}")) {
+      patterns.push(rawPattern);
+    } else {
+      patterns.push(...rawPattern.split(",").filter(Boolean));
+    }
+  }
+  return patterns;
+}
+function isSafeFile(filePath, safeExts) {
+  return safeExts.has(getFileExtension(filePath));
+}
+function toMirrorPath(workspaceRoot, mirrorRoot, originalAbsolute) {
+  const relative = path2.relative(workspaceRoot, originalAbsolute);
+  if (relative.startsWith("..") || path2.isAbsolute(relative)) {
+    throw new Error(`Path is outside the current workspace: ${originalAbsolute}`);
+  }
+  return path2.join(mirrorRoot, relative);
+}
+function toPortableRelativePath(filePath, root) {
+  const relative = path2.relative(root, filePath);
+  if (relative && !relative.startsWith("..") && !path2.isAbsolute(relative)) {
+    return toPortablePath(relative);
+  }
+  return toPortablePath(filePath);
+}
+function toPortablePath(filePath) {
+  return filePath.split(path2.sep).join("/");
+}
+function fileExistsSync(filePath) {
+  return existsSync(filePath);
+}
+function isNotFoundError(error2) {
+  return typeof error2 === "object" && error2 !== null && "code" in error2 && error2.code === "ENOENT";
+}
+
 // src/server.ts
-var SERVER_VERSION = true ? "0.1.3" : "0.1.0";
+var SERVER_VERSION = true ? "0.1.9" : "0.1.0";
 var SAFE_READ_TOOL = {
   name: "safe_read",
   description: "Read a configured GBK-safe text file. Decodes GBK or UTF-8 into UTF-8 text and returns numbered lines. Use this instead of Read for configured C/C++/SQL extensions.",
@@ -24865,6 +25307,79 @@ var SAFE_EDIT_TOOL = {
     openWorldHint: false
   }
 };
+var SAFE_SEARCH_TOOL = {
+  name: "safe_search",
+  description: "Search repository files with a ripgrep-like interface. GBK-safe extensions are decoded to UTF-8 temporary mirrors before matching. Use this instead of built-in Search/Grep.",
+  inputSchema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      pattern: {
+        type: "string",
+        description: "The regular expression pattern to search for in file contents."
+      },
+      path: {
+        type: "string",
+        description: "File or directory to search in. Defaults to current working directory. Relative paths are normalized by the Claude Code hook before this tool runs."
+      },
+      glob: {
+        type: "string",
+        description: 'Glob pattern to filter files, e.g. "*.cpp", "*.{h,hpp}", "*.proto", or "*.md".'
+      },
+      output_mode: {
+        type: "string",
+        enum: ["content", "files_with_matches", "count"],
+        description: 'Output mode: "content" shows matching lines, "files_with_matches" shows file paths, "count" shows match counts. Defaults to "files_with_matches".'
+      },
+      "-B": {
+        type: "number",
+        description: 'Number of lines to show before each match. Requires output_mode: "content".'
+      },
+      "-A": {
+        type: "number",
+        description: 'Number of lines to show after each match. Requires output_mode: "content".'
+      },
+      "-C": {
+        type: "number",
+        description: "Alias for context."
+      },
+      context: {
+        type: "number",
+        description: 'Number of lines to show before and after each match. Requires output_mode: "content".'
+      },
+      "-n": {
+        type: "boolean",
+        description: 'Show line numbers in output. Requires output_mode: "content". Defaults to true.'
+      },
+      "-i": {
+        type: "boolean",
+        description: "Case insensitive search."
+      },
+      type: {
+        type: "string",
+        description: "File type to search, equivalent to rg --type. Safe aliases include c, cpp, h, sql, proto."
+      },
+      head_limit: {
+        type: "number",
+        description: "Limit output to first N lines/entries. Defaults to 250 when unspecified. Pass 0 for unlimited."
+      },
+      offset: {
+        type: "number",
+        description: "Skip first N lines/entries before applying head_limit. Defaults to 0."
+      },
+      multiline: {
+        type: "boolean",
+        description: "Enable multiline mode where . matches newlines and patterns can span lines. Defaults to false."
+      }
+    },
+    required: ["pattern"]
+  },
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    openWorldHint: false
+  }
+};
 var server = new Server(
   {
     name: "safe-read-write-mcp",
@@ -24877,7 +25392,7 @@ var server = new Server(
   }
 );
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: [SAFE_READ_TOOL, SAFE_WRITE_TOOL, SAFE_EDIT_TOOL]
+  tools: [SAFE_READ_TOOL, SAFE_WRITE_TOOL, SAFE_EDIT_TOOL, SAFE_SEARCH_TOOL]
 }));
 server.setRequestHandler(
   CallToolRequestSchema,
@@ -24890,6 +25405,8 @@ server.setRequestHandler(
           return textResult(await safeWrite(parseSafeWriteArgs(params.arguments)));
         case "safe_edit":
           return textResult(await safeEdit(parseSafeEditArgs(params.arguments)));
+        case "safe_search":
+          return textResult(await safeSearch(parseSafeSearchArgs(params.arguments)));
         default:
           throw new Error(`Unknown tool: ${params.name}`);
       }
@@ -24909,11 +25426,11 @@ server.setRequestHandler(
 async function safeRead(args) {
   assertSafeTarget(args.file_path);
   const realPath = await realpathExistingFile(args.file_path);
-  const stat = await fs.stat(realPath);
+  const stat = await fs2.stat(realPath);
   if (stat.isDirectory()) {
     throw new Error(`Cannot read a directory: ${args.file_path}`);
   }
-  const decoded = decodeTextBuffer(await fs.readFile(realPath));
+  const decoded = decodeTextBuffer(await fs2.readFile(realPath));
   const readMtimeMs = Math.floor(stat.mtimeMs);
   const offset = args.offset ?? 1;
   const limit = args.limit;
@@ -24943,19 +25460,19 @@ ${numbered}`;
 }
 async function safeWrite(args) {
   assertSafeTarget(args.file_path);
-  const targetPath = path2.resolve(args.file_path);
-  const parent = path2.dirname(targetPath);
+  const targetPath = path3.resolve(args.file_path);
+  const parent = path3.dirname(targetPath);
   let existing = false;
   let realPath = targetPath;
   try {
     realPath = await realpathExistingFile(targetPath);
-    const stat = await fs.stat(realPath);
+    const stat = await fs2.stat(realPath);
     if (stat.isDirectory()) {
       throw new Error(`Cannot write a directory: ${args.file_path}`);
     }
     existing = true;
   } catch (error2) {
-    if (!isNotFoundError(error2)) throw error2;
+    if (!isNotFoundError2(error2)) throw error2;
   }
   if (existing) {
     const state = getFullReadState(realPath);
@@ -24964,8 +25481,8 @@ async function safeWrite(args) {
         "Existing file has not been fully read with safe_read in this MCP session. Use safe_read first before safe_write."
       );
     }
-    const currentStat = await fs.stat(realPath);
-    const current = decodeTextBuffer(await fs.readFile(realPath));
+    const currentStat = await fs2.stat(realPath);
+    const current = decodeTextBuffer(await fs2.readFile(realPath));
     if (Math.floor(currentStat.mtimeMs) > state.mtimeMs && current.content !== state.content) {
       throw new Error(
         "File has been modified since safe_read. Read it again before writing."
@@ -24983,7 +25500,7 @@ async function safeWrite(args) {
       state.hasUtf8Bom
     );
     await atomicWrite(realPath, buffer2);
-    const writtenStat2 = await fs.stat(realPath);
+    const writtenStat2 = await fs2.stat(realPath);
     setFullReadState(realPath, {
       content: args.content.replaceAll("\r\n", "\n"),
       encoding: state.encoding,
@@ -24993,11 +25510,11 @@ async function safeWrite(args) {
     });
     return `The file ${realPath} has been updated successfully using ${state.encoding} encoding.`;
   }
-  await fs.mkdir(parent, { recursive: true });
+  await fs2.mkdir(parent, { recursive: true });
   const buffer = encodeText(args.content, "gbk", "LF", false);
   await atomicWrite(targetPath, buffer);
-  realPath = await fs.realpath(targetPath);
-  const writtenStat = await fs.stat(realPath);
+  realPath = await fs2.realpath(targetPath);
+  const writtenStat = await fs2.stat(realPath);
   setFullReadState(realPath, {
     content: args.content.replaceAll("\r\n", "\n"),
     encoding: "gbk",
@@ -25014,37 +25531,37 @@ async function safeEdit(args) {
       "No changes to make: old_string and new_string are exactly the same."
     );
   }
-  const targetPath = path2.resolve(args.file_path);
-  const parent = path2.dirname(targetPath);
+  const targetPath = path3.resolve(args.file_path);
+  const parent = path3.dirname(targetPath);
   const replaceAll = args.replace_all ?? false;
   let existing = false;
   let realPath = targetPath;
   try {
     realPath = await realpathExistingFile(targetPath);
-    const stat = await fs.stat(realPath);
+    const stat = await fs2.stat(realPath);
     if (stat.isDirectory()) {
       throw new Error(`Cannot edit a directory: ${args.file_path}`);
     }
     existing = true;
   } catch (error2) {
-    if (!isNotFoundError(error2)) throw error2;
+    if (!isNotFoundError2(error2)) throw error2;
   }
   if (!existing) {
     if (args.old_string !== "") {
       throw new Error(`File does not exist: ${args.file_path}`);
     }
-    await fs.mkdir(parent, { recursive: true });
+    await fs2.mkdir(parent, { recursive: true });
     const buffer2 = encodeText(args.new_string, "gbk", "LF", false);
     await atomicWrite(targetPath, buffer2);
-    realPath = await fs.realpath(targetPath);
-    const writtenStat2 = await fs.stat(realPath);
+    realPath = await fs2.realpath(targetPath);
+    const writtenStat2 = await fs2.stat(realPath);
     markRead(realPath, Math.floor(writtenStat2.mtimeMs), {
       preserveFullRead: false
     });
     return `File created successfully at: ${realPath} using gbk encoding.`;
   }
-  const currentStat = await fs.stat(realPath);
-  const current = decodeTextBuffer(await fs.readFile(realPath));
+  const currentStat = await fs2.stat(realPath);
+  const current = decodeTextBuffer(await fs2.readFile(realPath));
   if (current.content.length > 0) {
     const state = getReadState(realPath);
     if (!state) {
@@ -25088,7 +25605,7 @@ String: ${args.old_string}`
     current.hasUtf8Bom
   );
   await atomicWrite(realPath, buffer);
-  const writtenStat = await fs.stat(realPath);
+  const writtenStat = await fs2.stat(realPath);
   markRead(realPath, Math.floor(writtenStat.mtimeMs), {
     preserveFullRead: false
   });
@@ -25150,6 +25667,80 @@ function parseSafeEditArgs(value) {
     replace_all: input.replace_all
   };
 }
+function parseSafeSearchArgs(value) {
+  const input = assertObject(value);
+  if (typeof input.pattern !== "string") {
+    throw new Error("safe_search requires string pattern.");
+  }
+  const args = { pattern: input.pattern };
+  if (input.path !== void 0) {
+    if (typeof input.path !== "string" || input.path.length === 0) {
+      throw new Error("safe_search path must be a non-empty string when provided.");
+    }
+    args.path = input.path;
+  }
+  if (input.glob !== void 0) {
+    if (typeof input.glob !== "string" || input.glob.length === 0) {
+      throw new Error("safe_search glob must be a non-empty string when provided.");
+    }
+    args.glob = input.glob;
+  }
+  if (input.output_mode !== void 0) {
+    if (!isSafeSearchOutputMode(input.output_mode)) {
+      throw new Error(
+        "safe_search output_mode must be one of: content, files_with_matches, count."
+      );
+    }
+    args.output_mode = input.output_mode;
+  }
+  parseOptionalNonnegativeNumber(input, args, "-B");
+  parseOptionalNonnegativeNumber(input, args, "-A");
+  parseOptionalNonnegativeNumber(input, args, "-C");
+  parseOptionalNonnegativeNumber(input, args, "context");
+  parseOptionalNonnegativeNumber(input, args, "head_limit");
+  parseOptionalNonnegativeNumber(input, args, "offset");
+  parseOptionalBoolean(input, args, "-n");
+  parseOptionalBoolean(input, args, "-i");
+  parseOptionalBoolean(input, args, "multiline");
+  if (input.type !== void 0) {
+    if (typeof input.type !== "string" || input.type.length === 0) {
+      throw new Error("safe_search type must be a non-empty string when provided.");
+    }
+    args.type = input.type;
+  }
+  return args;
+}
+function isSafeSearchOutputMode(value) {
+  return value === "content" || value === "files_with_matches" || value === "count";
+}
+function parseOptionalNonnegativeNumber(input, output, key) {
+  const value = coerceSemanticNumber(input[key]);
+  if (value === void 0) return;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    throw new Error(`safe_search ${key} must be a nonnegative number when provided.`);
+  }
+  output[key] = value;
+}
+function parseOptionalBoolean(input, output, key) {
+  const value = coerceSemanticBoolean(input[key]);
+  if (value === void 0) return;
+  if (typeof value !== "boolean") {
+    throw new Error(`safe_search ${key} must be a boolean when provided.`);
+  }
+  output[key] = value;
+}
+function coerceSemanticNumber(value) {
+  if (typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value)) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return value;
+}
+function coerceSemanticBoolean(value) {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return value;
+}
 function assertObject(value) {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new Error("Tool arguments must be an object.");
@@ -25164,9 +25755,9 @@ function assertSafeTarget(filePath) {
   }
 }
 async function realpathExistingFile(filePath) {
-  return fs.realpath(path2.resolve(filePath));
+  return fs2.realpath(path3.resolve(filePath));
 }
-function isNotFoundError(error2) {
+function isNotFoundError2(error2) {
   return typeof error2 === "object" && error2 !== null && "code" in error2 && error2.code === "ENOENT";
 }
 function isFullRead(offset, limit) {
@@ -25181,16 +25772,16 @@ function countOccurrences(content, search) {
   return content.split(search).length - 1;
 }
 async function atomicWrite(filePath, buffer) {
-  const dir = path2.dirname(filePath);
-  const tempPath = path2.join(
+  const dir = path3.dirname(filePath);
+  const tempPath = path3.join(
     dir,
-    `.${path2.basename(filePath)}.${process.pid}.${Date.now()}.tmp`
+    `.${path3.basename(filePath)}.${process.pid}.${Date.now()}.tmp`
   );
   try {
-    await fs.writeFile(tempPath, buffer);
-    await fs.rename(tempPath, filePath);
+    await fs2.writeFile(tempPath, buffer);
+    await fs2.rename(tempPath, filePath);
   } catch (error2) {
-    await fs.rm(tempPath, { force: true }).catch(() => void 0);
+    await fs2.rm(tempPath, { force: true }).catch(() => void 0);
     throw error2;
   }
 }

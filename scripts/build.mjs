@@ -1,4 +1,5 @@
-import { chmod, mkdir, readFile, rm } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { chmod, cp, mkdir, readFile, rm } from 'node:fs/promises'
 import { build } from 'esbuild'
 
 const packageJson = JSON.parse(await readFile('package.json', 'utf8'))
@@ -37,3 +38,7 @@ await Promise.all([
   chmod('dist/server.js', 0o755),
   chmod('dist/safe-rw-guard.js', 0o755),
 ])
+
+if (existsSync('vendor/ripgrep')) {
+  await cp('vendor/ripgrep', 'dist/vendor/ripgrep', { recursive: true })
+}

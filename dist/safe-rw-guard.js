@@ -16,7 +16,8 @@ var DEFAULT_SAFE_EXTS = [
   ".hpp",
   ".hxx",
   ".inl",
-  ".sql"
+  ".sql",
+  ".proto"
 ];
 function parseSafeExts(raw = process.env.SAFE_RW_EXTS) {
   const values = raw?.split(/[,\s;]+/).map((item) => item.trim()).filter(Boolean) ?? DEFAULT_SAFE_EXTS;
@@ -69,6 +70,7 @@ function isInsidePath(child, parent) {
 
 // src/safe-rw-guard.ts
 var BUILTIN_FILE_TOOLS = /* @__PURE__ */ new Set(["Read", "Write", "Edit"]);
+var BUILTIN_SEARCH_TOOLS = /* @__PURE__ */ new Set(["Grep", "Search"]);
 var SAFE_READ_TOOL_NAMES = /* @__PURE__ */ new Set([
   "mcp__safe_rw__safe_read",
   "safe_read"
@@ -81,22 +83,35 @@ var SAFE_EDIT_TOOL_NAMES = /* @__PURE__ */ new Set([
   "mcp__safe_rw__safe_edit",
   "safe_edit"
 ]);
+var SAFE_SEARCH_TOOL_NAMES = /* @__PURE__ */ new Set([
+  "mcp__safe_rw__safe_search",
+  "safe_search"
+]);
 function main() {
   const input = readHookInput();
   if (input.hook_event_name !== "PreToolUse") return;
   const toolName = input.tool_name ?? "";
-  const filePath = input.tool_input?.file_path;
-  if (typeof filePath !== "string" || filePath.length === 0) return;
+  const toolInput = input.tool_input ?? {};
   const safeExts = parseSafeExts();
-  const isTarget = isSafeExtension(filePath, safeExts);
-  if (BUILTIN_FILE_TOOLS.has(toolName) && isTarget) {
+  const filePath = toolInput.file_path;
+  if (BUILTIN_FILE_TOOLS.has(toolName)) {
+    if (typeof filePath !== "string" || filePath.length === 0) return;
+    if (isSafeExtension(filePath, safeExts)) {
+      deny(
+        `Files with this extension must use safe GBK-aware tools. Use ${getSafeToolName(toolName)} instead: ${filePath}`
+      );
+    }
+    return;
+  }
+  if (BUILTIN_SEARCH_TOOLS.has(toolName)) {
     deny(
-      `Files with this extension must use safe GBK-aware tools. Use ${getSafeToolName(toolName)} instead: ${filePath}`
+      "Built-in Search/Grep is disabled in this repository. Use mcp__safe_rw__safe_search for all content searches."
     );
     return;
   }
-  if (isSafeToolName(toolName)) {
-    if (!isTarget) {
+  if (isSafeFileToolName(toolName)) {
+    if (typeof filePath !== "string" || filePath.length === 0) return;
+    if (!isSafeExtension(filePath, safeExts)) {
       deny(
         `safe_read/safe_write/safe_edit only handle configured GBK-safe extensions. Use built-in Read/Write/Edit for this file: ${filePath}`
       );
@@ -109,10 +124,24 @@ function main() {
     } catch (error) {
       deny(error instanceof Error ? error.message : String(error));
     }
+    return;
+  }
+  if (isSafeSearchToolName(toolName)) {
+    if (typeof toolInput.path !== "string" || toolInput.path.length === 0) return;
+    try {
+      const cwd = input.cwd ?? process.cwd();
+      const absolutePath = resolveHookPathInsideCwd(cwd, toolInput.path);
+      updateInput({ ...toolInput, path: absolutePath });
+    } catch (error) {
+      deny(error instanceof Error ? error.message : String(error));
+    }
   }
 }
-function isSafeToolName(toolName) {
+function isSafeFileToolName(toolName) {
   return SAFE_READ_TOOL_NAMES.has(toolName) || SAFE_WRITE_TOOL_NAMES.has(toolName) || SAFE_EDIT_TOOL_NAMES.has(toolName);
+}
+function isSafeSearchToolName(toolName) {
+  return SAFE_SEARCH_TOOL_NAMES.has(toolName);
 }
 function getSafeToolName(toolName) {
   switch (toolName) {

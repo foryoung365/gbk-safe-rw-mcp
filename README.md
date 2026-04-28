@@ -1,28 +1,30 @@
-# Safe Read/Write/Edit MCP 使用说明
+# Safe Read/Write/Edit/Search MCP 使用说明
 
-本目录提供一个本地 stdio MCP 服务，用于在 Claude Code 中安全读写 GBK 编码的遗留 C/C++ 与 SQL 文本文件。
+本目录提供一个本地 stdio MCP 服务，用于在 Claude Code 中安全读写和搜索 GBK 编码的遗留 C/C++、SQL 与 Proto 文本文件。
 
-它提供三个工具：
+它提供四个工具：
 
 - `safe_read`：读取目标后缀文件，自动将 GBK 或 UTF-8 解码为 UTF-8 文本返回给 agent。
 - `safe_write`：完整覆盖写入目标后缀文件，写入前将 UTF-8 内容转换回目标文件编码。
 - `safe_edit`：按精确字符串替换方式局部修改目标后缀文件，并保持原文件编码。
+- `safe_search`：替代内置 Search/Grep 执行全仓库搜索；受保护后缀会先将 GBK 或 UTF-8 解码为 UTF-8 临时镜像，其他文件按原样进入镜像，再调用 `ripgrep` 匹配。
 
 默认受保护后缀为：
 
 ```text
-.c,.cc,.cpp,.cxx,.h,.hh,.hpp,.hxx,.inl,.sql
+.c,.cc,.cpp,.cxx,.h,.hh,.hpp,.hxx,.inl,.sql,.proto
 ```
 
 ## 基本机制
 
-Claude Code 内置 `Read` / `Write` / `Edit` 默认按 UTF-8 处理文本。对于 GBK 编码的遗留源码，直接写入中文注释可能导致乱码或破坏文件编码。
+Claude Code 内置 `Read` / `Write` / `Edit` 默认按 UTF-8 处理文本；内置 Search/Grep 对 GBK 中文内容也不能按 UTF-8 文本语义稳定匹配。对于 GBK 编码的遗留源码，直接读写或搜索中文内容可能导致乱码、误判或破坏文件编码。
 
 本工具采用以下策略：
 
-- 对受保护后缀，禁止使用内置 `Read` / `Write` / `Edit`。
-- 对受保护后缀，要求使用 `safe_read` / `safe_write` / `safe_edit`。
-- 对非受保护后缀，禁止使用 `safe_read` / `safe_write` / `safe_edit`，提示改用内置工具。
+- 对受保护后缀，禁止使用内置 `Read` / `Write` / `Edit`，要求使用 `safe_read` / `safe_write` / `safe_edit`。
+- 完全禁止使用内置 Search/Grep，所有内容搜索都必须使用 `safe_search`。
+- `safe_search` 可搜索全仓库文件；受保护后缀会做编码转换，非受保护文件按原样搜索。
+- 对非受保护后缀，禁止使用 `safe_read` / `safe_write` / `safe_edit`，提示改用内置读写编辑工具。
 - 相对路径由 Claude Code hook 根据当前 `cwd` 转换为绝对路径，并限制在当前工作区内。
 
 ## 安装与构建
@@ -44,6 +46,18 @@ npm run build
 I:/claude-code-source-code/safe-read-write-mcp/dist/server.js
 I:/claude-code-source-code/safe-read-write-mcp/dist/safe-rw-guard.js
 ```
+
+`safe_search` 依赖真实 `ripgrep` 来对齐 Claude Code 内置 Search/Grep 的行为。当前发布包已内置 Windows x64 版 `rg.exe`：
+
+```text
+dist/vendor/ripgrep/win32/x64/rg.exe
+```
+
+在 Windows x64 离线环境中，不需要额外安装 `ripgrep`。其他平台运行时需要满足以下任一条件：
+
+- 已安装 `rg`，并且 `rg` 位于 `PATH` 中。
+- 在 `dist/vendor/ripgrep/<platform>/<arch>/` 下提供 `rg` 或 `rg.exe`。
+- 启动 Claude Code 前设置 `SAFE_RW_RG_PATH`，指向可执行的 `rg`。
 
 ### 离线使用
 
@@ -148,7 +162,7 @@ claude
         ".claude/mcp/gbk-safe-rw-mcp/dist/server.js"
       ],
       "env": {
-        "SAFE_RW_EXTS": ".c,.cc,.cpp,.cxx,.h,.hh,.hpp,.hxx,.inl,.sql"
+        "SAFE_RW_EXTS": ".c,.cc,.cpp,.cxx,.h,.hh,.hpp,.hxx,.inl,.sql,.proto"
       }
     }
   }
@@ -160,13 +174,13 @@ claude
 ```json
 {
   "env": {
-    "SAFE_RW_EXTS": ".c,.cc,.cpp,.cxx,.h,.hh,.hpp,.hxx,.inl,.sql"
+    "SAFE_RW_EXTS": ".c,.cc,.cpp,.cxx,.h,.hh,.hpp,.hxx,.inl,.sql,.proto"
   },
   "enabledMcpjsonServers": ["safe_rw"],
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Read|Write|Edit",
+        "matcher": "Read|Write|Edit|Grep|Search",
         "hooks": [
           {
             "type": "command",
@@ -177,13 +191,13 @@ claude
         ]
       },
       {
-        "matcher": "mcp__safe_rw__safe_read|mcp__safe_rw__safe_write|mcp__safe_rw__safe_edit",
+        "matcher": "mcp__safe_rw__safe_read|mcp__safe_rw__safe_write|mcp__safe_rw__safe_edit|mcp__safe_rw__safe_search",
         "hooks": [
           {
             "type": "command",
             "command": "node .claude/mcp/gbk-safe-rw-mcp/dist/safe-rw-guard.js",
             "timeout": 5,
-            "statusMessage": "规范化 safe read/write/edit 路径"
+            "statusMessage": "规范化 safe read/write/edit/search 路径"
           }
         ]
       }
@@ -207,14 +221,16 @@ claude
 mcp__safe_rw__safe_read
 mcp__safe_rw__safe_write
 mcp__safe_rw__safe_edit
+mcp__safe_rw__safe_search
 ```
 
 实际使用时只需向 agent 明确要求：
 
-- 读取 `.cpp`、`.h`、`.sql` 等受保护文件时使用 `safe_read`。
+- 读取 `.cpp`、`.h`、`.sql`、`.proto` 等受保护文件时使用 `safe_read`。
 - 局部修改这些文件时使用 `safe_edit`。
 - 完整覆盖写入这些文件时使用 `safe_write`。
-- 不要对这些文件使用内置 `Read` / `Write` / `Edit`。
+- 搜索任何文件内容时使用 `safe_search`。
+- 不要对这些文件使用内置 `Read` / `Write` / `Edit` / `Search`。
 
 `safe_read` 参数：
 
@@ -255,6 +271,28 @@ mcp__safe_rw__safe_edit
 `safe_edit` 是局部修改工具，语义接近 Claude Code 内置 `Edit`：它会在当前文件中查找 `old_string` 并替换为 `new_string`。默认要求 `old_string` 在文件中唯一；如果需要替换所有匹配项，请设置 `replace_all: true`。
 
 对于已有非空文件，`safe_edit` 要求此前执行过 `safe_read`，但不要求完整读取；可以先使用 `offset` / `limit` 查看相关上下文，然后执行 `safe_edit`。如果文件在读取后被外部修改，且没有可用于确认内容未变化的完整读取快照，`safe_edit` 会拒绝写入并要求重新读取。
+
+`safe_search` 参数对标 Claude Code 内置 Search/Grep：
+
+```json
+{
+  "pattern": "中文注释|TODO",
+  "path": "src",
+  "glob": "*.{cpp,h,proto}",
+  "output_mode": "content",
+  "-C": 2,
+  "-n": true,
+  "-i": false,
+  "type": "cpp",
+  "head_limit": 100,
+  "offset": 0,
+  "multiline": false
+}
+```
+
+只有 `pattern` 必填，其他参数均可省略。`safe_search` 会搜索全仓库文件，默认输出 `files_with_matches`；`output_mode: "content"` 返回匹配行，`output_mode: "count"` 返回各文件匹配计数。`glob`、`type`、`head_limit`、`offset`、上下文参数 `-A` / `-B` / `-C` / `context` 直接映射到 `ripgrep`，与内置 Search/Grep 保持同类语义。
+
+说明：`safe_search` 会把仓库文件映射到系统临时目录，其中受保护后缀文件会被解码为 UTF-8，非受保护文件会按原样复制，然后调用 `ripgrep` 搜索临时镜像，并把结果路径映射回原仓库路径。因此它可以匹配 GBK 文件中的中文，同时复用 `ripgrep` 的正则、glob、多行匹配、上下文和计数行为。
 
 ## 编码规则
 
@@ -299,7 +337,7 @@ File has been modified since safe_read...
 
 说明文件在读取后又被外部修改。请重新读取后再写入。
 
-如果内置 `Read` / `Write` / `Edit` 被 hook 阻止，说明目标文件后缀受保护，应改用 `safe_read` / `safe_write` / `safe_edit`。
+如果内置 `Read` / `Write` / `Edit` / `Search` 被 hook 阻止，说明目标文件后缀受保护或搜索可能触达受保护后缀，应改用 `safe_read` / `safe_write` / `safe_edit` / `safe_search`。
 
 ## 建议加入 CLAUDE.md 的内容
 
@@ -308,19 +346,21 @@ File has been modified since safe_read...
 ```markdown
 ## GBK 源码读写规则
 
-本仓库包含 GBK 编码的遗留 C/C++ 与 SQL 文件。为避免中文注释乱码或破坏文件编码，处理以下后缀文件时必须使用 GBK 安全读写工具：
+本仓库包含 GBK 编码的遗留 C/C++、SQL 与 Proto 文件。为避免中文注释乱码、搜索误判或破坏文件编码，处理以下后缀文件时必须使用 GBK 安全读写与搜索工具：
 
-`.c`, `.cc`, `.cpp`, `.cxx`, `.h`, `.hh`, `.hpp`, `.hxx`, `.inl`, `.sql`
+`.c`, `.cc`, `.cpp`, `.cxx`, `.h`, `.hh`, `.hpp`, `.hxx`, `.inl`, `.sql`, `.proto`
 
 规则如下：
 
 - 读取上述后缀文件时，必须使用 `mcp__safe_rw__safe_read`，不要使用内置 `Read`。
 - 局部修改上述后缀文件时，必须使用 `mcp__safe_rw__safe_edit`，不要使用内置 `Edit`。
 - 完整覆盖写入上述后缀文件时，必须使用 `mcp__safe_rw__safe_write`，不要使用内置 `Write`。
+- 搜索任何文件内容时，必须使用 `mcp__safe_rw__safe_search`，不要使用内置 Search/Grep。
 - 可以使用 `offset` / `limit` 局部读取文件以查看上下文。
 - 写入已有文件前，必须先使用 `mcp__safe_rw__safe_read` 完整读取该文件，即不要带 `offset` 或 `limit`。
 - `mcp__safe_rw__safe_write` 是完整文件覆盖工具；写入时必须提供完整文件内容。
 - `mcp__safe_rw__safe_edit` 是精确字符串替换工具；默认要求 `old_string` 唯一，多处匹配时必须设置 `replace_all: true`。
-- 对非上述后缀文件，继续使用内置 `Read` / `Write` / `Edit`。
+- `mcp__safe_rw__safe_search` 对标内置 Search/Grep 参数，可搜索全仓库文件；受保护后缀会自动进行 GBK/UTF-8 转换。
+- 对非上述后缀文件，继续使用内置 `Read` / `Write` / `Edit`，但搜索仍必须使用 `mcp__safe_rw__safe_search`。
 - 如果 hook 阻止某次工具调用，应按错误提示改用对应工具，不要绕过该限制。
 ```

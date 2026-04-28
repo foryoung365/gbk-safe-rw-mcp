@@ -11,6 +11,7 @@ export const DEFAULT_SAFE_EXTS = [
   '.hxx',
   '.inl',
   '.sql',
+  '.proto',
 ]
 
 export type TextEncoding = 'utf8' | 'gbk'
