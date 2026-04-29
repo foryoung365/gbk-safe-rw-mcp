@@ -3229,8 +3229,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path4) {
-      let input = path4;
+    function removeDotSegments(path5) {
+      let input = path5;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3429,8 +3429,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path4, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path4 && path4 !== "/" ? path4 : void 0;
+        const [path5, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path5 && path5 !== "/" ? path5 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -6792,12 +6792,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs3, exportName) {
+    function addFormats(ajv, list, fs4, exportName) {
       var _a2;
       var _b;
       (_a2 = (_b = ajv.opts.code).formats) !== null && _a2 !== void 0 ? _a2 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs3[f]);
+        ajv.addFormat(f, fs4[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -10588,8 +10588,8 @@ var require_lib = __commonJS({
 });
 
 // src/server.ts
-import fs2 from "node:fs/promises";
-import path3 from "node:path";
+import fs3 from "node:fs/promises";
+import path4 from "node:path";
 
 // node_modules/zod/v3/helpers/util.js
 var util;
@@ -10950,8 +10950,8 @@ function getErrorMap() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path4, errorMaps, issueData } = params;
-  const fullPath = [...path4, ...issueData.path || []];
+  const { data, path: path5, errorMaps, issueData } = params;
+  const fullPath = [...path5, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -11066,11 +11066,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path4, key) {
+  constructor(parent, value, path5, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path4;
+    this._path = path5;
     this._key = key;
   }
   get path() {
@@ -14714,10 +14714,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path4) {
-  if (!path4)
+function getElementAtPath(obj, path5) {
+  if (!path5)
     return obj;
-  return path4.reduce((acc, key) => acc?.[key], obj);
+  return path5.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -15100,11 +15100,11 @@ function aborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path4, issues) {
+function prefixIssues(path5, issues) {
   return issues.map((iss) => {
     var _a2;
     (_a2 = iss).path ?? (_a2.path = []);
-    iss.path.unshift(path4);
+    iss.path.unshift(path5);
     return iss;
   });
 }
@@ -24634,6 +24634,58 @@ var DEFAULT_SAFE_EXTS = [
   ".sql",
   ".proto"
 ];
+var DEFAULT_SEARCH_EXCLUDE_DIRS = [
+  ".git",
+  ".svn",
+  ".hg",
+  ".bzr",
+  ".jj",
+  ".sl",
+  "build",
+  "build64",
+  "bin",
+  "obj",
+  "out",
+  "output",
+  "dist",
+  "target",
+  "Debug",
+  "Release",
+  "x64",
+  "x86",
+  ".vs",
+  "CMakeFiles",
+  "_ReSharper.Caches"
+];
+var DEFAULT_SEARCH_EXCLUDE_EXTS = [
+  ".exe",
+  ".dll",
+  ".lib",
+  ".pdb",
+  ".ilk",
+  ".obj",
+  ".o",
+  ".a",
+  ".so",
+  ".dylib",
+  ".pch",
+  ".idb",
+  ".ipch",
+  ".res",
+  ".exp",
+  ".map",
+  ".class",
+  ".jar",
+  ".zip",
+  ".7z",
+  ".rar",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif"
+];
+var DEFAULT_SEARCH_MIRROR_CONCURRENCY = 8;
+var DEFAULT_SEARCH_MIRROR_CACHE_MAX_FILES = 1e4;
 function parseSafeExts(raw = process.env.SAFE_RW_EXTS) {
   const values = raw?.split(/[,\s;]+/).map((item) => item.trim()).filter(Boolean) ?? DEFAULT_SAFE_EXTS;
   const normalized = values.map((item) => {
@@ -24647,6 +24699,35 @@ function getFileExtension(filePath) {
 }
 function isSafeExtension(filePath, safeExts = parseSafeExts()) {
   return safeExts.has(getFileExtension(filePath));
+}
+function parseSearchExcludeDirs(raw = process.env.SAFE_RW_SEARCH_EXCLUDE_DIRS) {
+  if (raw === void 0) return DEFAULT_SEARCH_EXCLUDE_DIRS;
+  if (raw.trim() === "") return [];
+  return parseList(raw).map((item) => item.replace(/[\\/]+$/g, "").replace(/^[\\/]+/g, "")).filter(Boolean);
+}
+function parseSearchExcludeExts(raw = process.env.SAFE_RW_SEARCH_EXCLUDE_EXTS) {
+  if (raw === void 0) return new Set(DEFAULT_SEARCH_EXCLUDE_EXTS);
+  if (raw.trim() === "") return /* @__PURE__ */ new Set();
+  return new Set(
+    parseList(raw).map((item) => {
+      const lower = item.toLowerCase();
+      return lower.startsWith(".") ? lower : `.${lower}`;
+    })
+  );
+}
+function parseSearchMirrorConcurrency(raw = process.env.SAFE_RW_SEARCH_MIRROR_CONCURRENCY) {
+  return clampInteger(raw, DEFAULT_SEARCH_MIRROR_CONCURRENCY, 1, 64);
+}
+function parseSearchMirrorCacheMaxFiles(raw = process.env.SAFE_RW_SEARCH_MIRROR_CACHE_MAX_FILES) {
+  return clampInteger(raw, DEFAULT_SEARCH_MIRROR_CACHE_MAX_FILES, 0, 1e6);
+}
+function parseList(raw) {
+  return raw.split(/[,\s;]+/).map((item) => item.trim()).filter(Boolean);
+}
+function clampInteger(raw, fallback, min, max) {
+  const value = Number.parseInt(raw ?? "", 10);
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, value));
 }
 
 // src/file-state.ts
@@ -24672,12 +24753,47 @@ function setFullReadState(realPath, state) {
   });
 }
 
+// src/path-utils.ts
+import fs from "node:fs";
+import path2 from "node:path";
+function resolveHookPathInsideCwd(cwd, inputPath) {
+  const rootReal = fs.realpathSync.native(path2.resolve(cwd));
+  const candidate = path2.isAbsolute(inputPath) ? path2.resolve(inputPath) : path2.resolve(rootReal, inputPath);
+  const ancestor = findExistingAncestor(candidate);
+  const ancestorReal = fs.realpathSync.native(ancestor);
+  if (!isInsidePath(ancestorReal, rootReal)) {
+    throw new Error(`Path is outside the current workspace: ${inputPath}`);
+  }
+  const suffix = path2.relative(ancestor, candidate);
+  const resolved = path2.resolve(ancestorReal, suffix);
+  if (!isInsidePath(resolved, rootReal)) {
+    throw new Error(`Path escapes the current workspace: ${inputPath}`);
+  }
+  return resolved;
+}
+function findExistingAncestor(candidate) {
+  let current = candidate;
+  while (!fs.existsSync(current)) {
+    const parent = path2.dirname(current);
+    if (parent === current) {
+      throw new Error(`No existing parent directory for path: ${candidate}`);
+    }
+    current = parent;
+  }
+  return current;
+}
+function isInsidePath(child, parent) {
+  const relative = path2.relative(parent, child);
+  return relative === "" || !relative.startsWith("..") && !path2.isAbsolute(relative);
+}
+
 // src/safe-search.ts
 import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
-import fs from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { existsSync, rmSync } from "node:fs";
+import fs2 from "node:fs/promises";
 import os from "node:os";
-import path2 from "node:path";
+import path3 from "node:path";
 import { fileURLToPath } from "node:url";
 
 // src/text-codec.ts
@@ -24787,19 +24903,12 @@ function encodeText(content, encoding, lineEndings, hasUtf8Bom2) {
 }
 
 // src/safe-search.ts
-var VCS_DIRECTORIES_TO_EXCLUDE = [
-  ".git",
-  ".svn",
-  ".hg",
-  ".bzr",
-  ".jj",
-  ".sl"
-];
-var VCS_DIRECTORY_SET = new Set(VCS_DIRECTORIES_TO_EXCLUDE);
-var IGNORE_FILENAMES = /* @__PURE__ */ new Set([".gitignore", ".ignore", ".rgignore"]);
 var DEFAULT_HEAD_LIMIT = 250;
 var MAX_BUFFER_SIZE = 2e7;
 var RG_TIMEOUT_MS = 2e4;
+var TARGET_ARGS_MAX_CHARS = 24e3;
+var UNPARSED_SORT_PATH = "~~~~";
+var UNPARSED_SORT_LINE = Number.MAX_SAFE_INTEGER;
 var SAFE_TYPE_ADDS = {
   c: ["*.c", "*.h"],
   cc: ["*.cc", "*.cpp", "*.cxx", "*.h", "*.hh", "*.hpp", "*.hxx", "*.inl"],
@@ -24810,150 +24919,441 @@ var SAFE_TYPE_ADDS = {
   proto: ["*.proto"],
   protobuf: ["*.proto"]
 };
+var KNOWN_NON_SAFE_TYPES = /* @__PURE__ */ new Set([
+  "js",
+  "ts",
+  "tsx",
+  "jsx",
+  "json",
+  "jsonl",
+  "py",
+  "rust",
+  "go",
+  "java",
+  "kotlin",
+  "scala",
+  "swift",
+  "ruby",
+  "php",
+  "perl",
+  "lua",
+  "dart",
+  "elixir",
+  "erlang",
+  "html",
+  "css",
+  "scss",
+  "sass",
+  "less",
+  "xml",
+  "yaml",
+  "yml",
+  "toml",
+  "md",
+  "markdown",
+  "sh",
+  "bash",
+  "zsh",
+  "fish",
+  "powershell",
+  "ps1",
+  "docker",
+  "make",
+  "cmake"
+]);
+var mirrorCacheRoot;
+var mirrorCacheRootPromise;
+var mirrorCacheCleanupRegistered = false;
+var mirrorCache = /* @__PURE__ */ new Map();
+var mirrorCacheInFlight = /* @__PURE__ */ new Map();
 async function safeSearch(args) {
   const outputMode = args.output_mode ?? "files_with_matches";
-  const workspaceRoot = path2.resolve(process.cwd());
-  const targetPath = path2.resolve(args.path ?? workspaceRoot);
+  const workspaceRoot = path3.resolve(process.cwd());
+  const targetPath = path3.resolve(args.path ?? workspaceRoot);
+  const targetStat = await statSearchTarget(workspaceRoot, targetPath);
   const safeExts = parseSafeExts();
-  const tempDir = await fs.mkdtemp(path2.join(os.tmpdir(), "safe-rw-search-"));
+  const excludeDirs = parseSearchExcludeDirs();
+  const excludeExts = parseSearchExcludeExts();
+  const mirrorConcurrency = parseSearchMirrorConcurrency();
+  const mirrorCacheMaxFiles = parseSearchMirrorCacheMaxFiles();
+  if (canUseSingleNonSafeFileFastPath(
+    workspaceRoot,
+    targetPath,
+    targetStat.isFile(),
+    safeExts,
+    excludeDirs,
+    excludeExts
+  ) || canUseNonSafeFilterFastPath(args, targetPath, targetStat.isFile(), safeExts)) {
+    return await searchOriginalFastPath({
+      args,
+      outputMode,
+      workspaceRoot,
+      targetPath,
+      excludeDirs,
+      excludeExts
+    });
+  }
+  const candidates = await listCandidateFiles({
+    args,
+    workspaceRoot,
+    targetPath,
+    targetIsDirectory: targetStat.isDirectory(),
+    excludeDirs,
+    excludeExts
+  });
+  if (candidates.length === 0) return formatEmptyResult(outputMode);
+  const safeCandidates = candidates.filter(
+    (file2) => isSafeFile(file2.originalAbsolute, safeExts)
+  );
+  const nonSafeCandidates = candidates.filter(
+    (file2) => !isSafeFile(file2.originalAbsolute, safeExts)
+  );
+  let tempDir;
   try {
-    const mirror = await createUtf8Mirror(workspaceRoot, targetPath, safeExts, tempDir);
-    if (mirror.files.length === 0) {
-      return formatEmptyResult(outputMode);
+    const matchedFiles = [];
+    const contentLines = [];
+    const countEntries = [];
+    let order = 0;
+    if (safeCandidates.length > 0) {
+      const mirror = await createUtf8Mirror(
+        workspaceRoot,
+        safeCandidates,
+        mirrorConcurrency,
+        mirrorCacheMaxFiles
+      );
+      tempDir = mirror.tempDir;
+      const rawResults = await runRipgrepForTargetBatches(
+        buildRipgrepSearchArgs(args, outputMode),
+        mirror.files.map((file2) => file2.searchAbsolute)
+      );
+      const mapped = mapRawResults(rawResults, mirror.files, outputMode, order);
+      matchedFiles.push(...mapped.files);
+      contentLines.push(...mapped.content);
+      countEntries.push(...mapped.counts);
+      order += rawResults.length;
     }
-    const rgArgs = buildRipgrepArgs(args, outputMode);
-    const rawResults = await runRipgrep(rgArgs, mirror.target);
+    if (nonSafeCandidates.length > 0) {
+      const nonSafeFiles = nonSafeCandidates.map(toOriginalSearchableFile);
+      const rawResults = await runRipgrepForTargetBatches(
+        buildRipgrepSearchArgs(args, outputMode),
+        nonSafeFiles.map((file2) => file2.originalAbsolute)
+      );
+      const mapped = mapRawResults(rawResults, nonSafeFiles, outputMode, order);
+      matchedFiles.push(...mapped.files);
+      contentLines.push(...mapped.content);
+      countEntries.push(...mapped.counts);
+    }
     if (outputMode === "content") {
-      return formatContentResult(rawResults, mirror.files, args);
+      return formatContentResult(contentLines, args);
     }
     if (outputMode === "count") {
-      return formatCountResult(rawResults, mirror.files, args);
+      return formatCountResult(countEntries, args);
     }
-    return formatFilesWithMatchesResult(rawResults, mirror.files, args);
+    return await formatFilesWithMatchesResult(matchedFiles, args);
   } finally {
-    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => void 0);
+    if (tempDir) {
+      await fs2.rm(tempDir, { recursive: true, force: true }).catch(() => void 0);
+    }
   }
 }
-async function createUtf8Mirror(workspaceRoot, targetPath, safeExts, tempDir) {
-  const rootStat = await fs.stat(workspaceRoot);
+async function statSearchTarget(workspaceRoot, targetPath) {
+  const rootStat = await fs2.stat(workspaceRoot);
   if (!rootStat.isDirectory()) {
     throw new Error(`Current working directory is not a directory: ${workspaceRoot}`);
   }
-  const targetStat = await fs.stat(targetPath).catch((error2) => {
+  assertPathInsideWorkspace(workspaceRoot, targetPath);
+  const targetStat = await fs2.stat(targetPath).catch((error2) => {
     if (isNotFoundError(error2)) {
       throw new Error(`Path does not exist: ${targetPath}`);
     }
     throw error2;
   });
-  const mirrorRoot = path2.join(tempDir, "mirror");
-  await fs.mkdir(mirrorRoot, { recursive: true });
-  await fs.mkdir(path2.join(mirrorRoot, ".git"), { recursive: true });
-  const targetDir = targetStat.isDirectory() ? targetPath : path2.dirname(targetPath);
-  await copyAncestorIgnoreFiles(workspaceRoot, targetDir, mirrorRoot);
-  const files = [];
-  if (targetStat.isFile()) {
-    files.push(await mirrorFile(workspaceRoot, mirrorRoot, targetPath, targetStat.mtimeMs, safeExts));
-  } else if (targetStat.isDirectory()) {
-    await mirrorDirectory(workspaceRoot, mirrorRoot, targetPath, safeExts, files);
-  } else {
+  if (!targetStat.isFile() && !targetStat.isDirectory()) {
     throw new Error(`Path is not a file or directory: ${targetPath}`);
   }
+  return targetStat;
+}
+async function searchOriginalFastPath({
+  args,
+  outputMode,
+  workspaceRoot,
+  targetPath,
+  excludeDirs,
+  excludeExts
+}) {
+  const excludeDirSet = new Set(excludeDirs.map((dir) => dir.toLowerCase()));
+  const targetStat = await fs2.stat(targetPath);
+  if (targetStat.isFile() && isExcludedByConfig(targetPath, workspaceRoot, excludeDirSet, excludeExts)) {
+    return formatEmptyResult(outputMode);
+  }
+  const rawResults = await runRipgrep(
+    buildRipgrepSearchArgs(args, outputMode, { excludeDirs, excludeExts }),
+    targetPath
+  );
+  const mapped = mapOriginalRawResults(rawResults, outputMode, workspaceRoot, 0);
+  if (outputMode === "content") return formatContentResult(mapped.content, args);
+  if (outputMode === "count") return formatCountResult(mapped.counts, args);
+  return await formatFilesWithMatchesResult(mapped.files, args);
+}
+function canUseSingleNonSafeFileFastPath(workspaceRoot, targetPath, targetIsFile, safeExts, excludeDirs, excludeExts) {
+  if (!targetIsFile) return false;
+  if (!isPathInside(workspaceRoot, targetPath)) return false;
+  if (isSafeFile(targetPath, safeExts)) return false;
+  const excludeDirSet = new Set(excludeDirs.map((dir) => dir.toLowerCase()));
+  return !isExcludedByConfig(targetPath, workspaceRoot, excludeDirSet, excludeExts);
+}
+function canUseNonSafeFilterFastPath(args, targetPath, targetIsFile, safeExts) {
+  if (targetIsFile && isSafeFile(targetPath, safeExts)) return false;
+  if (args.type) {
+    if (isKnownNonSafeType(args.type)) return true;
+    return false;
+  }
+  return args.glob !== void 0 && globOnlyMatchesNonSafeExts(args.glob, safeExts);
+}
+function isKnownNonSafeType(type) {
+  const normalized = normalizeRipgrepType(type);
+  return !SAFE_TYPE_ADDS[normalized] && KNOWN_NON_SAFE_TYPES.has(normalized);
+}
+function globOnlyMatchesNonSafeExts(glob, safeExts) {
+  let sawPositivePattern = false;
+  for (const pattern of splitGlobPatterns(glob)) {
+    const trimmed = pattern.trim();
+    if (!trimmed || trimmed.startsWith("!")) continue;
+    sawPositivePattern = true;
+    const exts = extractGlobExtensions(trimmed);
+    if (exts.size === 0) return false;
+    for (const ext of exts) {
+      if (safeExts.has(ext)) return false;
+    }
+  }
+  return sawPositivePattern;
+}
+function extractGlobExtensions(pattern) {
+  const exts = /* @__PURE__ */ new Set();
+  const braceMatches = pattern.matchAll(/\.\{([^}]+)\}/g);
+  for (const match of braceMatches) {
+    const values = match[1].split(",");
+    for (const value of values) {
+      const normalized2 = normalizeExtension(value);
+      if (normalized2) exts.add(normalized2);
+    }
+  }
+  if (exts.size > 0) return exts;
+  const plain = pattern.replace(/\.\{[^}]+\}/g, "");
+  const matches = [...plain.matchAll(/\.([A-Za-z0-9_+-]+)/g)];
+  const last = matches.at(-1)?.[1];
+  const normalized = last ? normalizeExtension(last) : "";
+  if (normalized) exts.add(normalized);
+  return exts;
+}
+function normalizeExtension(value) {
+  const clean = value.trim().replace(/[^A-Za-z0-9_+-].*$/, "").toLowerCase();
+  if (!clean) return "";
+  return clean.startsWith(".") ? clean : `.${clean}`;
+}
+async function listCandidateFiles({
+  args,
+  workspaceRoot,
+  targetPath,
+  targetIsDirectory,
+  excludeDirs,
+  excludeExts
+}) {
+  const rawFiles = await runRipgrep(
+    buildRipgrepFileArgs(args, excludeDirs, excludeExts),
+    targetPath
+  );
+  const byPath = /* @__PURE__ */ new Map();
+  const excludeDirSet = new Set(excludeDirs.map((dir) => dir.toLowerCase()));
+  for (const rawFile of rawFiles) {
+    const absolutePath = resolveRipgrepFilePath(rawFile, targetPath, targetIsDirectory);
+    if (!isPathInside(workspaceRoot, absolutePath)) continue;
+    if (isExcludedByConfig(absolutePath, workspaceRoot, excludeDirSet, excludeExts)) {
+      continue;
+    }
+    const key = normalizeLookupKey(absolutePath);
+    if (!byPath.has(key)) {
+      byPath.set(key, {
+        originalAbsolute: absolutePath,
+        originalRelative: toPortableRelativePath(absolutePath, workspaceRoot),
+        originalPortableAbsolute: toPortablePath(absolutePath)
+      });
+    }
+  }
+  return [...byPath.values()];
+}
+async function createUtf8Mirror(workspaceRoot, candidates, concurrency, cacheMaxFiles) {
+  const tempDir = cacheMaxFiles === 0 ? await fs2.mkdtemp(path3.join(os.tmpdir(), "safe-rw-search-")) : void 0;
+  const mirrorRoot = tempDir ? path3.join(tempDir, "mirror") : void 0;
+  if (mirrorRoot) await fs2.mkdir(mirrorRoot, { recursive: true });
+  const files = await mapWithConcurrency(
+    candidates,
+    concurrency,
+    (candidate) => mirrorFile(workspaceRoot, mirrorRoot, candidate, cacheMaxFiles)
+  );
   return {
-    root: mirrorRoot,
-    target: toMirrorPath(workspaceRoot, mirrorRoot, targetPath),
-    files
+    files,
+    tempDir
   };
 }
-async function mirrorDirectory(workspaceRoot, mirrorRoot, dir, safeExts, files) {
-  const entries = await fs.readdir(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    const absolutePath = path2.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (VCS_DIRECTORY_SET.has(entry.name)) continue;
-      await mirrorDirectory(workspaceRoot, mirrorRoot, absolutePath, safeExts, files);
-      continue;
-    }
-    if (!entry.isFile()) continue;
-    if (IGNORE_FILENAMES.has(entry.name)) {
-      const stat2 = await fs.stat(absolutePath);
-      files.push(await mirrorRawFile(workspaceRoot, mirrorRoot, absolutePath, stat2.mtimeMs));
-      continue;
-    }
-    const stat = await fs.stat(absolutePath);
-    files.push(await mirrorFile(workspaceRoot, mirrorRoot, absolutePath, stat.mtimeMs, safeExts));
+async function mirrorFile(workspaceRoot, mirrorRoot, candidate, cacheMaxFiles) {
+  const stat = await fs2.stat(candidate.originalAbsolute);
+  if (cacheMaxFiles > 0) {
+    return await mirrorFileWithCache(workspaceRoot, candidate, stat, cacheMaxFiles);
   }
-}
-async function mirrorFile(workspaceRoot, mirrorRoot, originalAbsolute, mtimeMs, safeExts) {
-  if (!isSafeFile(originalAbsolute, safeExts)) {
-    return mirrorRawFile(workspaceRoot, mirrorRoot, originalAbsolute, mtimeMs);
+  if (!mirrorRoot) {
+    throw new Error("Internal error: mirror root is required when cache is disabled.");
   }
   try {
-    return await mirrorTextFile(workspaceRoot, mirrorRoot, originalAbsolute, mtimeMs);
+    return await mirrorTextFile(workspaceRoot, mirrorRoot, candidate, stat.mtimeMs);
   } catch {
-    return mirrorRawFile(workspaceRoot, mirrorRoot, originalAbsolute, mtimeMs);
+    return await mirrorRawFile(workspaceRoot, mirrorRoot, candidate, stat.mtimeMs);
   }
 }
-async function mirrorTextFile(workspaceRoot, mirrorRoot, originalAbsolute, mtimeMs) {
-  const decoded = decodeTextBuffer(await fs.readFile(originalAbsolute));
-  const mirrorAbsolute = toMirrorPath(workspaceRoot, mirrorRoot, originalAbsolute);
-  await fs.mkdir(path2.dirname(mirrorAbsolute), { recursive: true });
-  await fs.writeFile(mirrorAbsolute, decoded.content, "utf8");
-  return {
-    originalAbsolute,
-    originalRelative: toPortableRelativePath(originalAbsolute, workspaceRoot),
-    mirrorAbsolute,
-    mirrorPortableAbsolute: toPortablePath(mirrorAbsolute),
-    mtimeMs
-  };
-}
-async function copyAncestorIgnoreFiles(workspaceRoot, targetDir, mirrorRoot) {
-  const relative = path2.relative(workspaceRoot, targetDir);
-  if (relative.startsWith("..") || path2.isAbsolute(relative)) return;
-  const segments = relative === "" ? [] : relative.split(path2.sep);
-  let current = workspaceRoot;
-  await copyIgnoreFilesInDirectory(workspaceRoot, mirrorRoot, current);
-  for (const segment of segments) {
-    current = path2.join(current, segment);
-    await copyIgnoreFilesInDirectory(workspaceRoot, mirrorRoot, current);
+async function mirrorFileWithCache(workspaceRoot, candidate, stat, cacheMaxFiles) {
+  const mtimeMs = Number(stat.mtimeMs);
+  const size = Number(stat.size);
+  const key = mirrorCacheKey(candidate.originalAbsolute, mtimeMs, size);
+  const cached2 = mirrorCache.get(key);
+  if (cached2 && fileExistsSync(cached2.searchFile.searchAbsolute)) {
+    cached2.lastUsed = Date.now();
+    return cached2.searchFile;
+  }
+  if (cached2) mirrorCache.delete(key);
+  const inFlight = mirrorCacheInFlight.get(key);
+  if (inFlight) return await inFlight;
+  const promise2 = mirrorFileIntoCache(workspaceRoot, candidate, stat, key);
+  mirrorCacheInFlight.set(key, promise2);
+  try {
+    const searchFile = await promise2;
+    mirrorCache.set(key, {
+      key,
+      searchFile,
+      lastUsed: Date.now()
+    });
+    await trimMirrorCache(cacheMaxFiles);
+    return searchFile;
+  } finally {
+    mirrorCacheInFlight.delete(key);
   }
 }
-async function copyIgnoreFilesInDirectory(workspaceRoot, mirrorRoot, dir) {
-  for (const name of IGNORE_FILENAMES) {
-    const filePath = path2.join(dir, name);
+async function mirrorFileIntoCache(workspaceRoot, candidate, stat, key) {
+  const cacheRoot = await getMirrorCacheRoot();
+  const mirrorAbsolute = toCacheMirrorPath(cacheRoot, key, candidate.originalRelative);
+  try {
+    return await mirrorTextFileAt(candidate, mirrorAbsolute, Number(stat.mtimeMs));
+  } catch {
+    return await mirrorRawFileAt(candidate, mirrorAbsolute, Number(stat.mtimeMs));
+  }
+}
+async function getMirrorCacheRoot() {
+  if (mirrorCacheRoot) return mirrorCacheRoot;
+  mirrorCacheRootPromise ??= fs2.mkdtemp(
+    path3.join(os.tmpdir(), "safe-rw-search-cache-")
+  );
+  mirrorCacheRoot = await mirrorCacheRootPromise;
+  registerMirrorCacheCleanup();
+  return mirrorCacheRoot;
+}
+function registerMirrorCacheCleanup() {
+  if (mirrorCacheCleanupRegistered) return;
+  mirrorCacheCleanupRegistered = true;
+  process.once("exit", () => {
+    if (!mirrorCacheRoot) return;
     try {
-      const stat = await fs.stat(filePath);
-      if (stat.isFile()) await copyRawFile(workspaceRoot, mirrorRoot, filePath);
-    } catch (error2) {
-      if (!isNotFoundError(error2)) throw error2;
+      rmSync(mirrorCacheRoot, { recursive: true, force: true });
+    } catch {
     }
+  });
+}
+async function trimMirrorCache(cacheMaxFiles) {
+  if (cacheMaxFiles <= 0) return;
+  if (mirrorCache.size <= cacheMaxFiles) return;
+  const entries = [...mirrorCache.values()].sort(
+    (a, b) => a.lastUsed - b.lastUsed
+  );
+  const removeCount = mirrorCache.size - cacheMaxFiles;
+  for (const entry of entries.slice(0, removeCount)) {
+    mirrorCache.delete(entry.key);
+    await fs2.rm(path3.dirname(entry.searchFile.searchAbsolute), {
+      recursive: true,
+      force: true
+    }).catch(() => void 0);
   }
 }
-async function copyRawFile(workspaceRoot, mirrorRoot, originalAbsolute) {
-  const mirrorAbsolute = toMirrorPath(workspaceRoot, mirrorRoot, originalAbsolute);
-  await fs.mkdir(path2.dirname(mirrorAbsolute), { recursive: true });
-  await fs.copyFile(originalAbsolute, mirrorAbsolute);
+function mirrorCacheKey(originalAbsolute, mtimeMs, size) {
+  return `${normalizeLookupKey(originalAbsolute)}\0${mtimeMs}\0${size}`;
 }
-async function mirrorRawFile(workspaceRoot, mirrorRoot, originalAbsolute, mtimeMs) {
-  await copyRawFile(workspaceRoot, mirrorRoot, originalAbsolute);
-  const mirrorAbsolute = toMirrorPath(workspaceRoot, mirrorRoot, originalAbsolute);
+function toCacheMirrorPath(cacheRoot, key, originalRelative) {
+  const hash2 = createHash("sha1").update(key).digest("hex");
+  return path3.join(cacheRoot, hash2, ...originalRelative.split("/"));
+}
+async function mirrorTextFile(workspaceRoot, mirrorRoot, candidate, mtimeMs) {
+  const decoded = decodeTextBuffer(await fs2.readFile(candidate.originalAbsolute));
+  const mirrorAbsolute = toMirrorPath(
+    workspaceRoot,
+    mirrorRoot,
+    candidate.originalAbsolute
+  );
+  return await mirrorTextFileAt(candidate, mirrorAbsolute, mtimeMs, decoded.content);
+}
+async function mirrorTextFileAt(candidate, mirrorAbsolute, mtimeMs, decodedContent) {
+  const content = decodedContent ?? decodeTextBuffer(await fs2.readFile(candidate.originalAbsolute)).content;
+  await fs2.mkdir(path3.dirname(mirrorAbsolute), { recursive: true });
+  await fs2.writeFile(mirrorAbsolute, content, "utf8");
   return {
-    originalAbsolute,
-    originalRelative: toPortableRelativePath(originalAbsolute, workspaceRoot),
-    mirrorAbsolute,
-    mirrorPortableAbsolute: toPortablePath(mirrorAbsolute),
+    ...candidate,
+    searchAbsolute: mirrorAbsolute,
+    searchPortableAbsolute: toPortablePath(mirrorAbsolute),
     mtimeMs
   };
 }
-function buildRipgrepArgs(args, outputMode) {
+async function mirrorRawFile(workspaceRoot, mirrorRoot, candidate, mtimeMs) {
+  const mirrorAbsolute = toMirrorPath(
+    workspaceRoot,
+    mirrorRoot,
+    candidate.originalAbsolute
+  );
+  return await mirrorRawFileAt(candidate, mirrorAbsolute, mtimeMs);
+}
+async function mirrorRawFileAt(candidate, mirrorAbsolute, mtimeMs) {
+  await fs2.mkdir(path3.dirname(mirrorAbsolute), { recursive: true });
+  await fs2.copyFile(candidate.originalAbsolute, mirrorAbsolute);
+  return {
+    ...candidate,
+    searchAbsolute: mirrorAbsolute,
+    searchPortableAbsolute: toPortablePath(mirrorAbsolute),
+    mtimeMs
+  };
+}
+function toOriginalSearchableFile(candidate) {
+  return {
+    ...candidate,
+    searchAbsolute: candidate.originalAbsolute,
+    searchPortableAbsolute: candidate.originalPortableAbsolute
+  };
+}
+function buildRipgrepFileArgs(args, excludeDirs, excludeExts) {
+  const rgArgs = ["--files", "--hidden"];
+  addTypeDefinitions(rgArgs);
+  addSearchExcludeArgs(rgArgs, excludeDirs, excludeExts);
+  addTypeAndGlobArgs(rgArgs, args);
+  return rgArgs;
+}
+function buildRipgrepSearchArgs(args, outputMode, options = {}) {
   const rgArgs = ["--hidden"];
-  for (const dir of VCS_DIRECTORIES_TO_EXCLUDE) {
-    rgArgs.push("--glob", `!${dir}`);
-  }
   rgArgs.push("--max-columns", "500");
-  for (const [type, globs] of Object.entries(SAFE_TYPE_ADDS)) {
-    for (const glob of globs) {
-      rgArgs.push("--type-add", `${type}:${glob}`);
-    }
+  rgArgs.push("--with-filename");
+  addTypeDefinitions(rgArgs);
+  if (options.excludeDirs || options.excludeExts) {
+    addSearchExcludeArgs(
+      rgArgs,
+      options.excludeDirs ?? [],
+      options.excludeExts ?? /* @__PURE__ */ new Set()
+    );
+  }
+  if (options.safeExtsToExclude) {
+    addExtensionExcludeArgs(rgArgs, options.safeExtsToExclude);
   }
   if (args.multiline) {
     rgArgs.push("-U", "--multiline-dotall");
@@ -24984,19 +25384,89 @@ function buildRipgrepArgs(args, outputMode) {
   } else {
     rgArgs.push(args.pattern);
   }
+  addTypeAndGlobArgs(rgArgs, args);
+  return rgArgs;
+}
+function addTypeDefinitions(rgArgs) {
+  for (const [type, globs] of Object.entries(SAFE_TYPE_ADDS)) {
+    for (const glob of globs) {
+      rgArgs.push("--type-add", `${type}:${glob}`);
+    }
+  }
+}
+function addTypeAndGlobArgs(rgArgs, args) {
   if (args.type) {
-    rgArgs.push("--type", args.type === "c++" ? "cpp" : args.type);
+    rgArgs.push("--type", normalizeRipgrepType(args.type));
   }
   if (args.glob) {
     for (const globPattern of splitGlobPatterns(args.glob)) {
       rgArgs.push("--glob", globPattern);
     }
   }
-  return rgArgs;
+}
+function addSearchExcludeArgs(rgArgs, excludeDirs, excludeExts) {
+  for (const dir of excludeDirs) {
+    const normalized = toPortablePath(dir).replace(/^\/+/, "").replace(/\/+$/, "");
+    if (!normalized) continue;
+    rgArgs.push("--iglob", `!${normalized}`);
+    rgArgs.push("--iglob", `!${normalized}/**`);
+    rgArgs.push("--iglob", `!**/${normalized}`);
+    rgArgs.push("--iglob", `!**/${normalized}/**`);
+  }
+  addExtensionExcludeArgs(rgArgs, excludeExts);
+}
+function addExtensionExcludeArgs(rgArgs, excludeExts) {
+  for (const ext of excludeExts) {
+    rgArgs.push("--iglob", `!*${ext}`);
+  }
+}
+async function mapWithConcurrency(items, concurrency, worker) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(concurrency, items.length);
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < items.length) {
+        const currentIndex = nextIndex;
+        nextIndex += 1;
+        results[currentIndex] = await worker(items[currentIndex]);
+      }
+    })
+  );
+  return results;
+}
+function normalizeRipgrepType(type) {
+  return type === "c++" ? "cpp" : type;
+}
+async function runRipgrepForTargetBatches(args, targets) {
+  if (targets.length === 0) return [];
+  const results = [];
+  for (const batch of chunkTargets(args, targets)) {
+    results.push(...await runRipgrep(args, batch));
+  }
+  return results;
+}
+function chunkTargets(args, targets) {
+  const batches = [];
+  let current = [];
+  let currentChars = args.reduce((sum, arg) => sum + arg.length + 1, 0);
+  for (const target of targets) {
+    const nextChars = target.length + 1;
+    if (current.length > 0 && currentChars + nextChars > TARGET_ARGS_MAX_CHARS) {
+      batches.push(current);
+      current = [];
+      currentChars = args.reduce((sum, arg) => sum + arg.length + 1, 0);
+    }
+    current.push(target);
+    currentChars += nextChars;
+  }
+  if (current.length > 0) batches.push(current);
+  return batches;
 }
 async function runRipgrep(args, target) {
   const { command, args: baseArgs } = await resolveRipgrepCommand();
-  const fullArgs = [...baseArgs, ...args, target];
+  const targets = Array.isArray(target) ? target : [target];
+  const fullArgs = [...baseArgs, ...args, ...targets];
   return new Promise((resolve, reject) => {
     execFile(
       command,
@@ -25054,8 +25524,8 @@ function parseExtraRipgrepArgs(raw) {
 function bundledRipgrepPath() {
   const platform = process.platform === "win32" ? "win32" : process.platform === "darwin" ? "darwin" : "linux";
   const executable = process.platform === "win32" ? "rg.exe" : "rg";
-  const candidate = path2.resolve(
-    path2.dirname(fileURLToPath(import.meta.url)),
+  const candidate = path3.resolve(
+    path3.dirname(fileURLToPath(import.meta.url)),
     "vendor",
     "ripgrep",
     platform,
@@ -25066,59 +25536,328 @@ function bundledRipgrepPath() {
 }
 async function assertExecutable(filePath) {
   try {
-    await fs.access(filePath);
+    await fs2.access(filePath);
   } catch {
     throw new Error(`SAFE_RW_RG_PATH does not exist or is not accessible: ${filePath}`);
   }
 }
-function formatContentResult(rawResults, files, args) {
+function mapRawResults(rawResults, files, outputMode, orderOffset) {
+  const index = createSearchFileIndex(files);
+  if (outputMode === "files_with_matches") {
+    return {
+      files: rawResults.map((line) => findFileForRipgrepLine(line, index, outputMode)?.file).filter((file2) => file2 !== void 0),
+      content: [],
+      counts: []
+    };
+  }
+  if (outputMode === "count") {
+    return {
+      files: [],
+      content: [],
+      counts: rawResults.map(
+        (line, indexInSource) => mapCountLine(line, index, orderOffset + indexInSource)
+      ).filter((entry) => entry !== void 0)
+    };
+  }
+  let lastParsed;
+  const content = [];
+  for (const [indexInSource, line] of rawResults.entries()) {
+    const mapped = mapContentLine(line, index, orderOffset + indexInSource);
+    if (mapped.parsed) {
+      lastParsed = {
+        sortPath: mapped.line.sortPath,
+        sortLine: mapped.line.sortLine
+      };
+      content.push(mapped.line);
+      continue;
+    }
+    if (line === "--" && lastParsed) {
+      content.push({
+        text: line,
+        sortPath: lastParsed.sortPath,
+        sortLine: lastParsed.sortLine + 0.1,
+        order: orderOffset + indexInSource
+      });
+      continue;
+    }
+    content.push(mapped.line);
+  }
+  return { files: [], content, counts: [] };
+}
+function mapOriginalRawResults(rawResults, outputMode, workspaceRoot, orderOffset) {
+  if (outputMode === "files_with_matches") {
+    return {
+      files: rawResults.map((line) => originalSearchableFileFromPath(line, workspaceRoot)).filter((file2) => file2 !== void 0),
+      content: [],
+      counts: []
+    };
+  }
+  if (outputMode === "count") {
+    return {
+      files: [],
+      content: [],
+      counts: rawResults.map(
+        (line, index) => mapOriginalCountLine(line, workspaceRoot, orderOffset + index)
+      ).filter((entry) => entry !== void 0)
+    };
+  }
+  let lastParsed;
+  const content = [];
+  for (const [index, line] of rawResults.entries()) {
+    const mapped = mapOriginalContentLine(line, workspaceRoot, orderOffset + index);
+    if (mapped.parsed) {
+      lastParsed = {
+        sortPath: mapped.line.sortPath,
+        sortLine: mapped.line.sortLine
+      };
+      content.push(mapped.line);
+      continue;
+    }
+    if (line === "--" && lastParsed) {
+      content.push({
+        text: line,
+        sortPath: lastParsed.sortPath,
+        sortLine: lastParsed.sortLine + 0.1,
+        order: orderOffset + index
+      });
+      continue;
+    }
+    content.push(mapped.line);
+  }
+  return { files: [], content, counts: [] };
+}
+function mapOriginalContentLine(line, workspaceRoot, order) {
+  const match = /^(.+?)([:-])(\d+)([:-])/.exec(line);
+  if (!match) {
+    return {
+      line: {
+        text: line,
+        sortPath: UNPARSED_SORT_PATH,
+        sortLine: UNPARSED_SORT_LINE,
+        order
+      },
+      parsed: false
+    };
+  }
+  const file2 = originalSearchableFileFromPath(match[1], workspaceRoot);
+  if (!file2) {
+    return {
+      line: {
+        text: line,
+        sortPath: UNPARSED_SORT_PATH,
+        sortLine: UNPARSED_SORT_LINE,
+        order
+      },
+      parsed: false
+    };
+  }
+  return {
+    line: {
+      text: `${file2.originalRelative}${line.slice(match[1].length)}`,
+      sortPath: file2.originalRelative,
+      sortLine: Number.parseInt(match[3], 10),
+      order
+    },
+    parsed: true
+  };
+}
+function mapOriginalCountLine(line, workspaceRoot, order) {
+  const colonIndex = line.lastIndexOf(":");
+  if (colonIndex <= 0) return void 0;
+  const file2 = originalSearchableFileFromPath(
+    line.slice(0, colonIndex),
+    workspaceRoot
+  );
+  if (!file2) return void 0;
+  const count = Number.parseInt(line.slice(colonIndex + 1), 10);
+  if (Number.isNaN(count)) return void 0;
+  return {
+    text: `${file2.originalRelative}:${count}`,
+    count,
+    sortPath: file2.originalRelative,
+    order
+  };
+}
+function originalSearchableFileFromPath(rawPath, workspaceRoot) {
+  const absolutePath = path3.isAbsolute(rawPath) ? path3.normalize(rawPath) : path3.resolve(workspaceRoot, rawPath);
+  if (!isPathInside(workspaceRoot, absolutePath)) return void 0;
+  return toOriginalSearchableFile({
+    originalAbsolute: absolutePath,
+    originalRelative: toPortableRelativePath(absolutePath, workspaceRoot),
+    originalPortableAbsolute: toPortablePath(absolutePath)
+  });
+}
+function createSearchFileIndex(files) {
+  const byPath = /* @__PURE__ */ new Map();
+  for (const file2 of files) {
+    byPath.set(normalizeLookupKey(file2.searchAbsolute), file2);
+    byPath.set(normalizeLookupKey(file2.searchPortableAbsolute), file2);
+    byPath.set(normalizeLookupKey(file2.originalAbsolute), file2);
+    byPath.set(normalizeLookupKey(file2.originalPortableAbsolute), file2);
+  }
+  return {
+    byPath,
+    fallbackFiles: [...files].sort(
+      (a, b) => b.searchAbsolute.length - a.searchAbsolute.length
+    )
+  };
+}
+function mapContentLine(line, index, order) {
+  const match = findFileForRipgrepLine(line, index, "content");
+  if (!match) {
+    return {
+      line: {
+        text: line,
+        sortPath: UNPARSED_SORT_PATH,
+        sortLine: UNPARSED_SORT_LINE,
+        order
+      },
+      parsed: false
+    };
+  }
+  return {
+    line: {
+      text: replaceSearchPath(line, match.file),
+      sortPath: match.file.originalRelative,
+      sortLine: match.lineNumber ?? UNPARSED_SORT_LINE,
+      order
+    },
+    parsed: true
+  };
+}
+function mapCountLine(line, index, order) {
+  const match = findFileForRipgrepLine(line, index, "count");
+  if (!match) return void 0;
+  const count = parseCount(line, match.file);
+  if (count === void 0) return void 0;
+  return {
+    text: `${match.file.originalRelative}:${count}`,
+    count,
+    sortPath: match.file.originalRelative,
+    order
+  };
+}
+function findFileForRipgrepLine(line, index, outputMode) {
+  if (outputMode === "files_with_matches") {
+    const exact = lookupSearchPath(line, index);
+    return exact ? { file: exact } : void 0;
+  }
+  if (outputMode === "count") {
+    const colonIndex = line.lastIndexOf(":");
+    if (colonIndex > 0) {
+      const exact = lookupSearchPath(line.slice(0, colonIndex), index);
+      if (exact) return { file: exact };
+    }
+    return findFileByPrefix(line, index);
+  }
+  const parsed = parseContentPathAndLine(line, index);
+  if (parsed) return parsed;
+  return findFileByPrefix(line, index);
+}
+function parseContentPathAndLine(line, index) {
+  const match = /^(.+?)([:-])(\d+)([:-])/.exec(line);
+  if (!match) return void 0;
+  const file2 = lookupSearchPath(match[1], index);
+  if (!file2) return void 0;
+  return {
+    file: file2,
+    lineNumber: Number.parseInt(match[3], 10)
+  };
+}
+function lookupSearchPath(searchPath, index) {
+  return index.byPath.get(normalizeLookupKey(searchPath));
+}
+function findFileByPrefix(line, index) {
+  for (const file2 of index.fallbackFiles) {
+    const absoluteMatch = matchFilePrefix(line, file2.searchAbsolute);
+    if (absoluteMatch) {
+      return { file: file2, lineNumber: absoluteMatch.lineNumber };
+    }
+    const portableMatch = matchFilePrefix(line, file2.searchPortableAbsolute);
+    if (portableMatch) {
+      return { file: file2, lineNumber: portableMatch.lineNumber };
+    }
+  }
+  return void 0;
+}
+function matchFilePrefix(line, searchPath) {
+  if (line === searchPath) return {};
+  if (!line.startsWith(searchPath)) return void 0;
+  const separator = line[searchPath.length];
+  if (separator !== ":" && separator !== "-") return void 0;
+  const rest = line.slice(searchPath.length + 1);
+  const lineMatch = /^(\d+)([:-])/.exec(rest);
+  return {
+    lineNumber: lineMatch ? Number.parseInt(lineMatch[1], 10) : void 0
+  };
+}
+function replaceSearchPath(line, file2) {
+  for (const searchPath of [file2.searchAbsolute, file2.searchPortableAbsolute]) {
+    if (line === searchPath) return file2.originalRelative;
+    if (line.startsWith(`${searchPath}:`)) {
+      return `${file2.originalRelative}${line.slice(searchPath.length)}`;
+    }
+    if (line.startsWith(`${searchPath}-`)) {
+      return `${file2.originalRelative}${line.slice(searchPath.length)}`;
+    }
+  }
+  return line;
+}
+function parseCount(line, file2) {
+  for (const searchPath of [file2.searchAbsolute, file2.searchPortableAbsolute]) {
+    if (!line.startsWith(`${searchPath}:`)) continue;
+    const count = Number.parseInt(line.slice(searchPath.length + 1), 10);
+    return Number.isNaN(count) ? void 0 : count;
+  }
+  return void 0;
+}
+function formatContentResult(mappedLines, args) {
+  const sorted = [...mappedLines].sort(compareMappedLines);
   const { items, appliedLimit } = applyHeadLimit(
-    rawResults,
+    sorted,
     args.head_limit,
     args.offset ?? 0
   );
-  const finalLines = items.map((line) => mapRipgrepLine(line, files));
   const limitInfo = formatLimitInfo(appliedLimit, args.offset);
-  const resultContent = finalLines.join("\n") || "No matches found";
+  const resultContent = items.map((item) => item.text).join("\n") || "No matches found";
   return limitInfo ? `${resultContent}
 
 [Showing results with pagination = ${limitInfo}]` : resultContent;
 }
-function formatCountResult(rawResults, files, args) {
+function formatCountResult(countEntries, args) {
+  const sorted = [...countEntries].sort((a, b) => {
+    const pathComparison = a.sortPath.localeCompare(b.sortPath);
+    return pathComparison === 0 ? a.order - b.order : pathComparison;
+  });
   const { items, appliedLimit } = applyHeadLimit(
-    rawResults,
+    sorted,
     args.head_limit,
     args.offset ?? 0
   );
-  const finalCountLines = items.map((line) => mapRipgrepLine(line, files));
-  let totalMatches = 0;
-  let fileCount = 0;
-  for (const line of finalCountLines) {
-    const colonIndex = line.lastIndexOf(":");
-    if (colonIndex <= 0) continue;
-    const count = Number.parseInt(line.substring(colonIndex + 1), 10);
-    if (!Number.isNaN(count)) {
-      totalMatches += count;
-      fileCount += 1;
-    }
-  }
+  const totalMatches = items.reduce((sum, entry) => sum + entry.count, 0);
+  const fileCount = items.length;
   const limitInfo = formatLimitInfo(appliedLimit, args.offset);
-  const rawContent = finalCountLines.join("\n") || "No matches found";
+  const rawContent = items.map((item) => item.text).join("\n") || "No matches found";
   const summary = `
 
 Found ${totalMatches} total ${totalMatches === 1 ? "occurrence" : "occurrences"} across ${fileCount} ${fileCount === 1 ? "file" : "files"}.${limitInfo ? ` with pagination = ${limitInfo}` : ""}`;
   return rawContent + summary;
 }
-function formatFilesWithMatchesResult(rawResults, files, args) {
-  const matched = rawResults.map((line) => findFileForRipgrepPath(line, files)).filter((file2) => file2 !== void 0);
+async function formatFilesWithMatchesResult(matchedFiles, args) {
   const uniqueByPath = /* @__PURE__ */ new Map();
-  for (const file2 of matched) {
-    uniqueByPath.set(file2.mirrorAbsolute, file2);
+  for (const file2 of matchedFiles) {
+    uniqueByPath.set(normalizeLookupKey(file2.originalAbsolute), file2);
   }
-  const sorted = [...uniqueByPath.values()].sort((a, b) => {
+  const files = await Promise.all(
+    [...uniqueByPath.values()].map(async (file2) => ({
+      file: file2,
+      mtimeMs: await getFileMtime(file2)
+    }))
+  );
+  const sorted = files.sort((a, b) => {
     const timeComparison = b.mtimeMs - a.mtimeMs;
-    return timeComparison === 0 ? a.originalRelative.localeCompare(b.originalRelative) : timeComparison;
-  }).map((file2) => file2.originalRelative);
+    return timeComparison === 0 ? a.file.originalRelative.localeCompare(b.file.originalRelative) : timeComparison;
+  }).map((item) => item.file.originalRelative);
   const { items, appliedLimit } = applyHeadLimit(
     sorted,
     args.head_limit,
@@ -25129,37 +25868,27 @@ function formatFilesWithMatchesResult(rawResults, files, args) {
   return `Found ${items.length} ${items.length === 1 ? "file" : "files"}${limitInfo ? ` ${limitInfo}` : ""}
 ${items.join("\n")}`;
 }
+async function getFileMtime(file2) {
+  if (file2.mtimeMs !== void 0) return file2.mtimeMs;
+  try {
+    const stat = await fs2.stat(file2.originalAbsolute);
+    return stat.mtimeMs ?? 0;
+  } catch {
+    return 0;
+  }
+}
+function compareMappedLines(a, b) {
+  const pathComparison = a.sortPath.localeCompare(b.sortPath);
+  if (pathComparison !== 0) return pathComparison;
+  const lineComparison = a.sortLine - b.sortLine;
+  return lineComparison === 0 ? a.order - b.order : lineComparison;
+}
 function formatEmptyResult(outputMode) {
   if (outputMode === "files_with_matches") return "No files found";
   if (outputMode === "count") {
     return "No matches found\n\nFound 0 total occurrences across 0 files.";
   }
   return "No matches found";
-}
-function mapRipgrepLine(line, files) {
-  const file2 = findFileForRipgrepPath(line, files);
-  if (!file2) return line;
-  if (line === file2.mirrorAbsolute || line === file2.mirrorPortableAbsolute) {
-    return file2.originalRelative;
-  }
-  if (line.startsWith(`${file2.mirrorAbsolute}:`)) {
-    return `${file2.originalRelative}${line.slice(file2.mirrorAbsolute.length)}`;
-  }
-  if (line.startsWith(`${file2.mirrorAbsolute}-`)) {
-    return `${file2.originalRelative}${line.slice(file2.mirrorAbsolute.length)}`;
-  }
-  if (line.startsWith(`${file2.mirrorPortableAbsolute}:`)) {
-    return `${file2.originalRelative}${line.slice(file2.mirrorPortableAbsolute.length)}`;
-  }
-  if (line.startsWith(`${file2.mirrorPortableAbsolute}-`)) {
-    return `${file2.originalRelative}${line.slice(file2.mirrorPortableAbsolute.length)}`;
-  }
-  return line;
-}
-function findFileForRipgrepPath(line, files) {
-  return files.find(
-    (file2) => line === file2.mirrorAbsolute || line === file2.mirrorPortableAbsolute || line.startsWith(`${file2.mirrorAbsolute}:`) || line.startsWith(`${file2.mirrorAbsolute}-`) || line.startsWith(`${file2.mirrorPortableAbsolute}:`) || line.startsWith(`${file2.mirrorPortableAbsolute}-`)
-  );
 }
 function applyHeadLimit(items, limit, offset) {
   if (limit === 0) {
@@ -25195,22 +25924,50 @@ function splitGlobPatterns(glob) {
 function isSafeFile(filePath, safeExts) {
   return safeExts.has(getFileExtension(filePath));
 }
+function isExcludedByConfig(filePath, workspaceRoot, excludeDirSet, excludeExts) {
+  if (excludeExts.has(getFileExtension(filePath))) return true;
+  const relative = path3.relative(workspaceRoot, filePath);
+  if (relative.startsWith("..") || path3.isAbsolute(relative)) return true;
+  const segments = relative.split(/[\\/]+/);
+  for (const segment of segments.slice(0, -1)) {
+    if (excludeDirSet.has(segment.toLowerCase())) return true;
+  }
+  return false;
+}
+function resolveRipgrepFilePath(rawFile, targetPath, targetIsDirectory) {
+  if (path3.isAbsolute(rawFile)) return path3.normalize(rawFile);
+  const base = targetIsDirectory ? targetPath : path3.dirname(targetPath);
+  return path3.resolve(base, rawFile);
+}
 function toMirrorPath(workspaceRoot, mirrorRoot, originalAbsolute) {
-  const relative = path2.relative(workspaceRoot, originalAbsolute);
-  if (relative.startsWith("..") || path2.isAbsolute(relative)) {
+  const relative = path3.relative(workspaceRoot, originalAbsolute);
+  if (relative.startsWith("..") || path3.isAbsolute(relative)) {
     throw new Error(`Path is outside the current workspace: ${originalAbsolute}`);
   }
-  return path2.join(mirrorRoot, relative);
+  return path3.join(mirrorRoot, relative);
+}
+function assertPathInsideWorkspace(workspaceRoot, targetPath) {
+  if (!isPathInside(workspaceRoot, targetPath)) {
+    throw new Error(`Path is outside the current workspace: ${targetPath}`);
+  }
+}
+function isPathInside(root, target) {
+  const relative = path3.relative(root, target);
+  return relative === "" || !relative.startsWith("..") && !path3.isAbsolute(relative);
 }
 function toPortableRelativePath(filePath, root) {
-  const relative = path2.relative(root, filePath);
-  if (relative && !relative.startsWith("..") && !path2.isAbsolute(relative)) {
+  const relative = path3.relative(root, filePath);
+  if (relative && !relative.startsWith("..") && !path3.isAbsolute(relative)) {
     return toPortablePath(relative);
   }
   return toPortablePath(filePath);
 }
 function toPortablePath(filePath) {
-  return filePath.split(path2.sep).join("/");
+  return filePath.split(path3.sep).join("/");
+}
+function normalizeLookupKey(filePath) {
+  const normalized = path3.resolve(path3.normalize(filePath));
+  return process.platform === "win32" ? normalized.toLowerCase() : normalized;
 }
 function fileExistsSync(filePath) {
   return existsSync(filePath);
@@ -25220,7 +25977,7 @@ function isNotFoundError(error2) {
 }
 
 // src/server.ts
-var SERVER_VERSION = true ? "0.1.9" : "0.1.0";
+var SERVER_VERSION = true ? "0.1.13" : "0.1.0";
 var SAFE_READ_TOOL = {
   name: "safe_read",
   description: "Read a configured GBK-safe text file. Decodes GBK or UTF-8 into UTF-8 text and returns numbered lines. Use this instead of Read for configured C/C++/SQL extensions.",
@@ -25309,7 +26066,7 @@ var SAFE_EDIT_TOOL = {
 };
 var SAFE_SEARCH_TOOL = {
   name: "safe_search",
-  description: "Search repository files with a ripgrep-like interface. GBK-safe extensions are decoded to UTF-8 temporary mirrors before matching. Use this instead of built-in Search/Grep.",
+  description: "Search repository files with a ripgrep-like interface. GBK-safe extensions are decoded to UTF-8 temporary mirrors before matching. Use this instead of built-in Search/Grep/Glob or shell search commands.",
   inputSchema: {
     type: "object",
     additionalProperties: false,
@@ -25424,13 +26181,13 @@ server.setRequestHandler(
   }
 );
 async function safeRead(args) {
-  assertSafeTarget(args.file_path);
-  const realPath = await realpathExistingFile(args.file_path);
-  const stat = await fs2.stat(realPath);
+  const targetPath = resolveSafeTargetPath(args.file_path);
+  const realPath = await realpathExistingFile(targetPath);
+  const stat = await fs3.stat(realPath);
   if (stat.isDirectory()) {
     throw new Error(`Cannot read a directory: ${args.file_path}`);
   }
-  const decoded = decodeTextBuffer(await fs2.readFile(realPath));
+  const decoded = decodeTextBuffer(await fs3.readFile(realPath));
   const readMtimeMs = Math.floor(stat.mtimeMs);
   const offset = args.offset ?? 1;
   const limit = args.limit;
@@ -25459,14 +26216,13 @@ async function safeRead(args) {
 ${numbered}`;
 }
 async function safeWrite(args) {
-  assertSafeTarget(args.file_path);
-  const targetPath = path3.resolve(args.file_path);
-  const parent = path3.dirname(targetPath);
+  const targetPath = resolveSafeTargetPath(args.file_path);
+  const parent = path4.dirname(targetPath);
   let existing = false;
   let realPath = targetPath;
   try {
     realPath = await realpathExistingFile(targetPath);
-    const stat = await fs2.stat(realPath);
+    const stat = await fs3.stat(realPath);
     if (stat.isDirectory()) {
       throw new Error(`Cannot write a directory: ${args.file_path}`);
     }
@@ -25481,8 +26237,8 @@ async function safeWrite(args) {
         "Existing file has not been fully read with safe_read in this MCP session. Use safe_read first before safe_write."
       );
     }
-    const currentStat = await fs2.stat(realPath);
-    const current = decodeTextBuffer(await fs2.readFile(realPath));
+    const currentStat = await fs3.stat(realPath);
+    const current = decodeTextBuffer(await fs3.readFile(realPath));
     if (Math.floor(currentStat.mtimeMs) > state.mtimeMs && current.content !== state.content) {
       throw new Error(
         "File has been modified since safe_read. Read it again before writing."
@@ -25500,7 +26256,7 @@ async function safeWrite(args) {
       state.hasUtf8Bom
     );
     await atomicWrite(realPath, buffer2);
-    const writtenStat2 = await fs2.stat(realPath);
+    const writtenStat2 = await fs3.stat(realPath);
     setFullReadState(realPath, {
       content: args.content.replaceAll("\r\n", "\n"),
       encoding: state.encoding,
@@ -25510,11 +26266,11 @@ async function safeWrite(args) {
     });
     return `The file ${realPath} has been updated successfully using ${state.encoding} encoding.`;
   }
-  await fs2.mkdir(parent, { recursive: true });
+  await fs3.mkdir(parent, { recursive: true });
   const buffer = encodeText(args.content, "gbk", "LF", false);
   await atomicWrite(targetPath, buffer);
-  realPath = await fs2.realpath(targetPath);
-  const writtenStat = await fs2.stat(realPath);
+  realPath = await fs3.realpath(targetPath);
+  const writtenStat = await fs3.stat(realPath);
   setFullReadState(realPath, {
     content: args.content.replaceAll("\r\n", "\n"),
     encoding: "gbk",
@@ -25525,20 +26281,19 @@ async function safeWrite(args) {
   return `File created successfully at: ${realPath} using gbk encoding.`;
 }
 async function safeEdit(args) {
-  assertSafeTarget(args.file_path);
+  const targetPath = resolveSafeTargetPath(args.file_path);
   if (args.old_string === args.new_string) {
     throw new Error(
       "No changes to make: old_string and new_string are exactly the same."
     );
   }
-  const targetPath = path3.resolve(args.file_path);
-  const parent = path3.dirname(targetPath);
+  const parent = path4.dirname(targetPath);
   const replaceAll = args.replace_all ?? false;
   let existing = false;
   let realPath = targetPath;
   try {
     realPath = await realpathExistingFile(targetPath);
-    const stat = await fs2.stat(realPath);
+    const stat = await fs3.stat(realPath);
     if (stat.isDirectory()) {
       throw new Error(`Cannot edit a directory: ${args.file_path}`);
     }
@@ -25550,18 +26305,18 @@ async function safeEdit(args) {
     if (args.old_string !== "") {
       throw new Error(`File does not exist: ${args.file_path}`);
     }
-    await fs2.mkdir(parent, { recursive: true });
+    await fs3.mkdir(parent, { recursive: true });
     const buffer2 = encodeText(args.new_string, "gbk", "LF", false);
     await atomicWrite(targetPath, buffer2);
-    realPath = await fs2.realpath(targetPath);
-    const writtenStat2 = await fs2.stat(realPath);
+    realPath = await fs3.realpath(targetPath);
+    const writtenStat2 = await fs3.stat(realPath);
     markRead(realPath, Math.floor(writtenStat2.mtimeMs), {
       preserveFullRead: false
     });
     return `File created successfully at: ${realPath} using gbk encoding.`;
   }
-  const currentStat = await fs2.stat(realPath);
-  const current = decodeTextBuffer(await fs2.readFile(realPath));
+  const currentStat = await fs3.stat(realPath);
+  const current = decodeTextBuffer(await fs3.readFile(realPath));
   if (current.content.length > 0) {
     const state = getReadState(realPath);
     if (!state) {
@@ -25569,13 +26324,16 @@ async function safeEdit(args) {
         "Existing non-empty file has not been read with safe_read in this MCP session. Use safe_read before safe_edit."
       );
     }
-    if (Math.floor(currentStat.mtimeMs) > state.lastReadMtimeMs) {
-      const fullRead = state.fullRead;
-      if (!fullRead || current.content !== fullRead.content) {
-        throw new Error(
-          "File has been modified since safe_read. Read it again before editing."
-        );
-      }
+    const fullRead = state.fullRead;
+    if (fullRead && current.content !== fullRead.content) {
+      throw new Error(
+        "File content no longer matches the last safe_read result. Read it again before editing."
+      );
+    }
+    if (Math.floor(currentStat.mtimeMs) > state.lastReadMtimeMs && !fullRead) {
+      throw new Error(
+        "File has been modified since safe_read. Read it again before editing."
+      );
     }
   }
   let updatedContent;
@@ -25605,7 +26363,7 @@ String: ${args.old_string}`
     current.hasUtf8Bom
   );
   await atomicWrite(realPath, buffer);
-  const writtenStat = await fs2.stat(realPath);
+  const writtenStat = await fs3.stat(realPath);
   markRead(realPath, Math.floor(writtenStat.mtimeMs), {
     preserveFullRead: false
   });
@@ -25754,8 +26512,12 @@ function assertSafeTarget(filePath) {
     );
   }
 }
+function resolveSafeTargetPath(filePath) {
+  assertSafeTarget(filePath);
+  return resolveHookPathInsideCwd(process.cwd(), filePath);
+}
 async function realpathExistingFile(filePath) {
-  return fs2.realpath(path3.resolve(filePath));
+  return fs3.realpath(path4.resolve(filePath));
 }
 function isNotFoundError2(error2) {
   return typeof error2 === "object" && error2 !== null && "code" in error2 && error2.code === "ENOENT";
@@ -25772,16 +26534,16 @@ function countOccurrences(content, search) {
   return content.split(search).length - 1;
 }
 async function atomicWrite(filePath, buffer) {
-  const dir = path3.dirname(filePath);
-  const tempPath = path3.join(
+  const dir = path4.dirname(filePath);
+  const tempPath = path4.join(
     dir,
-    `.${path3.basename(filePath)}.${process.pid}.${Date.now()}.tmp`
+    `.${path4.basename(filePath)}.${process.pid}.${Date.now()}.tmp`
   );
   try {
-    await fs2.writeFile(tempPath, buffer);
-    await fs2.rename(tempPath, filePath);
+    await fs3.writeFile(tempPath, buffer);
+    await fs3.rename(tempPath, filePath);
   } catch (error2) {
-    await fs2.rm(tempPath, { force: true }).catch(() => void 0);
+    await fs3.rm(tempPath, { force: true }).catch(() => void 0);
     throw error2;
   }
 }

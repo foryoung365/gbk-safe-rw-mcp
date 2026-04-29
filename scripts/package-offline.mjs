@@ -13,6 +13,10 @@ import { fileURLToPath } from 'node:url'
 
 const PACKAGE_NAME = 'safe-read-write-mcp'
 const SAFE_EXTS = '.c,.cc,.cpp,.cxx,.h,.hh,.hpp,.hxx,.inl,.sql,.proto'
+const SEARCH_EXCLUDE_DIRS = '.git,.svn,.hg,.bzr,.jj,.sl,build,build64,bin,obj,out,output,dist,target,Debug,Release,x64,x86,.vs,CMakeFiles,_ReSharper.Caches'
+const SEARCH_EXCLUDE_EXTS = '.exe,.dll,.lib,.pdb,.ilk,.obj,.o,.a,.so,.dylib,.pch,.idb,.ipch,.res,.exp,.map,.class,.jar,.zip,.7z,.rar,.png,.jpg,.jpeg,.gif'
+const MIRROR_CONCURRENCY = '8'
+const MIRROR_CACHE_MAX_FILES = '10000'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const packageJsonPath = path.join(root, 'package.json')
@@ -87,7 +91,11 @@ import { cp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const SAFE_EXTS = process.env.SAFE_RW_EXTS || '.c,.cc,.cpp,.cxx,.h,.hh,.hpp,.hxx,.inl,.sql,.proto'
+const SAFE_EXTS = process.env.SAFE_RW_EXTS ?? '${SAFE_EXTS}'
+const SEARCH_EXCLUDE_DIRS = process.env.SAFE_RW_SEARCH_EXCLUDE_DIRS ?? '${SEARCH_EXCLUDE_DIRS}'
+const SEARCH_EXCLUDE_EXTS = process.env.SAFE_RW_SEARCH_EXCLUDE_EXTS ?? '${SEARCH_EXCLUDE_EXTS}'
+const MIRROR_CONCURRENCY = process.env.SAFE_RW_SEARCH_MIRROR_CONCURRENCY ?? '${MIRROR_CONCURRENCY}'
+const MIRROR_CACHE_MAX_FILES = process.env.SAFE_RW_SEARCH_MIRROR_CACHE_MAX_FILES ?? '${MIRROR_CACHE_MAX_FILES}'
 const packageDir = path.dirname(fileURLToPath(import.meta.url))
 const targetRepo = path.resolve(process.argv[2] || process.cwd())
 const vendorRelativeDir = '.claude/mcp/gbk-safe-rw-mcp'
@@ -121,6 +129,10 @@ async function writeMcpJson() {
     args: [serverPath],
     env: {
       SAFE_RW_EXTS: SAFE_EXTS,
+      SAFE_RW_SEARCH_EXCLUDE_DIRS: SEARCH_EXCLUDE_DIRS,
+      SAFE_RW_SEARCH_EXCLUDE_EXTS: SEARCH_EXCLUDE_EXTS,
+      SAFE_RW_SEARCH_MIRROR_CONCURRENCY: MIRROR_CONCURRENCY,
+      SAFE_RW_SEARCH_MIRROR_CACHE_MAX_FILES: MIRROR_CACHE_MAX_FILES,
     },
   }
   await writeJson(filePath, config)
@@ -132,7 +144,14 @@ async function writeClaudeSettings() {
   await mkdir(claudeDir, { recursive: true })
 
   const settings = await readJsonIfExists(filePath, {})
-  settings.env = { ...(settings.env || {}), SAFE_RW_EXTS: SAFE_EXTS }
+  settings.env = {
+    ...(settings.env || {}),
+    SAFE_RW_EXTS: SAFE_EXTS,
+    SAFE_RW_SEARCH_EXCLUDE_DIRS: SEARCH_EXCLUDE_DIRS,
+    SAFE_RW_SEARCH_EXCLUDE_EXTS: SEARCH_EXCLUDE_EXTS,
+    SAFE_RW_SEARCH_MIRROR_CONCURRENCY: MIRROR_CONCURRENCY,
+    SAFE_RW_SEARCH_MIRROR_CACHE_MAX_FILES: MIRROR_CACHE_MAX_FILES,
+  }
   settings.enabledMcpjsonServers = unique([
     ...(settings.enabledMcpjsonServers || []),
     'safe_rw',
@@ -145,7 +164,7 @@ async function writeClaudeSettings() {
   settings.hooks.PreToolUse = [
     ...existingPreToolUse.filter(item => !containsSafeRwGuard(item)),
     {
-      matcher: 'Read|Write|Edit|Grep|Search',
+      matcher: 'Read|Write|Edit|Grep|Search|Glob|Bash|PowerShell',
       hooks: [
         {
           type: 'command',
@@ -291,13 +310,43 @@ ${SAFE_EXTS}
 
 如需覆盖后缀，可在运行安装脚本前设置环境变量 \`SAFE_RW_EXTS\`。
 
+## safe_search 默认排除
+
+默认排除目录：
+
+\`\`\`text
+${SEARCH_EXCLUDE_DIRS}
+\`\`\`
+
+默认排除后缀：
+
+\`\`\`text
+${SEARCH_EXCLUDE_EXTS}
+\`\`\`
+
+如需覆盖默认排除目录或后缀，可在运行安装脚本前设置：
+
+\`\`\`bash
+SAFE_RW_SEARCH_EXCLUDE_DIRS="build,output,Debug"
+SAFE_RW_SEARCH_EXCLUDE_EXTS=".exe,.dll,.pdb"
+\`\`\`
+
+设置为空字符串表示不启用对应类别的额外排除。\`.pdf\` 不在默认排除后缀中；PDF 是否能被搜索到取决于 \`ripgrep\` 对该文件的文本/二进制判断。
+
+## safe_search 性能配置
+
+- \`SAFE_RW_SEARCH_MIRROR_CONCURRENCY\`：受保护文件转码镜像并发数，默认 \`${MIRROR_CONCURRENCY}\`，有效范围 1 到 64。
+- \`SAFE_RW_SEARCH_MIRROR_CACHE_MAX_FILES\`：MCP 进程内最多缓存的 UTF-8 镜像文件数，默认 \`${MIRROR_CACHE_MAX_FILES}\`；设置为 \`0\` 可关闭缓存。
+
+镜像缓存使用系统临时目录保存 UTF-8 临时文件，内存中只保存路径、mtime、size 等索引信息。MCP 进程退出时会尽力清理缓存目录。
+
 ## 注意事项
 
 - 受保护后缀文件必须使用 safe 读写编辑工具，不要使用内置 \`Read\` / \`Write\` / \`Edit\`。
-- 内置 Search/Grep 被完全禁用；所有内容搜索都必须使用 \`safe_search\`。
+- 内置 Search/Grep/Glob 被完全禁用；不要通过 \`Bash\` 或 \`PowerShell\` 调用 \`grep\`、\`rg\`、\`find\`、\`findstr\`、\`Select-String\` 等搜索命令；所有搜索都必须使用 \`safe_search\`。
 - \`safe_write\` 是完整覆盖写入；已有文件写入前必须先完整 \`safe_read\`。
 - \`safe_edit\` 是精确字符串替换；已有非空文件编辑前必须先 \`safe_read\`，但可以是局部读取。
-- \`safe_search\` 会搜索全仓库文件；受保护后缀会先将 GBK/UTF-8 文件解码为 UTF-8 临时镜像，其他文件按原样进入镜像，再调用 \`ripgrep\` 执行搜索。
+- \`safe_search\` 会搜索全仓库文件；受保护后缀会先将 GBK/UTF-8 文件解码为 UTF-8 临时镜像，非受保护文件直接在原仓库中调用 \`ripgrep\` 搜索。
 - 如果需要升级 MCP 版本，请用新发布包重新执行 \`install.mjs\`，然后提交更新后的 \`.claude/mcp/gbk-safe-rw-mcp/\`、\`.mcp.json\` 与 \`.claude/settings.json\`。
 `
 }

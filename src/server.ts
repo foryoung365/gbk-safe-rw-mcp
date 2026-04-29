@@ -16,6 +16,7 @@ import {
   markRead,
   setFullReadState,
 } from './file-state.js'
+import { resolveHookPathInsideCwd } from './path-utils.js'
 import { safeSearch, type SafeSearchArgs } from './safe-search.js'
 import { decodeTextBuffer, encodeText } from './text-codec.js'
 
@@ -139,7 +140,7 @@ const SAFE_EDIT_TOOL: Tool = {
 const SAFE_SEARCH_TOOL: Tool = {
   name: 'safe_search',
   description:
-    'Search repository files with a ripgrep-like interface. GBK-safe extensions are decoded to UTF-8 temporary mirrors before matching. Use this instead of built-in Search/Grep.',
+    'Search repository files with a ripgrep-like interface. GBK-safe extensions are decoded to UTF-8 temporary mirrors before matching. Use this instead of built-in Search/Grep/Glob or shell search commands.',
   inputSchema: {
     type: 'object',
     additionalProperties: false,
@@ -269,8 +270,8 @@ server.setRequestHandler(
 )
 
 async function safeRead(args: SafeReadArgs): Promise<string> {
-  assertSafeTarget(args.file_path)
-  const realPath = await realpathExistingFile(args.file_path)
+  const targetPath = resolveSafeTargetPath(args.file_path)
+  const realPath = await realpathExistingFile(targetPath)
   const stat = await fs.stat(realPath)
   if (stat.isDirectory()) {
     throw new Error(`Cannot read a directory: ${args.file_path}`)
@@ -309,8 +310,7 @@ async function safeRead(args: SafeReadArgs): Promise<string> {
 }
 
 async function safeWrite(args: SafeWriteArgs): Promise<string> {
-  assertSafeTarget(args.file_path)
-  const targetPath = path.resolve(args.file_path)
+  const targetPath = resolveSafeTargetPath(args.file_path)
   const parent = path.dirname(targetPath)
 
   let existing = false
@@ -384,14 +384,13 @@ async function safeWrite(args: SafeWriteArgs): Promise<string> {
 }
 
 async function safeEdit(args: SafeEditArgs): Promise<string> {
-  assertSafeTarget(args.file_path)
+  const targetPath = resolveSafeTargetPath(args.file_path)
   if (args.old_string === args.new_string) {
     throw new Error(
       'No changes to make: old_string and new_string are exactly the same.',
     )
   }
 
-  const targetPath = path.resolve(args.file_path)
   const parent = path.dirname(targetPath)
   const replaceAll = args.replace_all ?? false
 
@@ -435,13 +434,16 @@ async function safeEdit(args: SafeEditArgs): Promise<string> {
       )
     }
 
-    if (Math.floor(currentStat.mtimeMs) > state.lastReadMtimeMs) {
-      const fullRead = state.fullRead
-      if (!fullRead || current.content !== fullRead.content) {
-        throw new Error(
-          'File has been modified since safe_read. Read it again before editing.',
-        )
-      }
+    const fullRead = state.fullRead
+    if (fullRead && current.content !== fullRead.content) {
+      throw new Error(
+        'File content no longer matches the last safe_read result. Read it again before editing.',
+      )
+    }
+    if (Math.floor(currentStat.mtimeMs) > state.lastReadMtimeMs && !fullRead) {
+      throw new Error(
+        'File has been modified since safe_read. Read it again before editing.',
+      )
     }
   }
 
@@ -656,6 +658,11 @@ function assertSafeTarget(filePath: string): void {
       `safe_read/safe_write/safe_edit only handle configured GBK-safe extensions. Use built-in Read/Write/Edit for this file: ${filePath}`,
     )
   }
+}
+
+function resolveSafeTargetPath(filePath: string): string {
+  assertSafeTarget(filePath)
+  return resolveHookPathInsideCwd(process.cwd(), filePath)
 }
 
 async function realpathExistingFile(filePath: string): Promise<string> {

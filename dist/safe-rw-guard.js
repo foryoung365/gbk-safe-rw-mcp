@@ -70,7 +70,37 @@ function isInsidePath(child, parent) {
 
 // src/safe-rw-guard.ts
 var BUILTIN_FILE_TOOLS = /* @__PURE__ */ new Set(["Read", "Write", "Edit"]);
-var BUILTIN_SEARCH_TOOLS = /* @__PURE__ */ new Set(["Grep", "Search"]);
+var BUILTIN_SEARCH_TOOLS = /* @__PURE__ */ new Set(["Grep", "Search", "Glob"]);
+var SHELL_TOOLS = /* @__PURE__ */ new Set(["Bash", "PowerShell"]);
+var CONTENT_SEARCH_COMMANDS = /* @__PURE__ */ new Set([
+  "grep",
+  "egrep",
+  "fgrep",
+  "rg",
+  "ripgrep",
+  "ag",
+  "ack",
+  "ugrep",
+  "findstr",
+  "select-string",
+  "sls"
+]);
+var FILE_SEARCH_COMMANDS = /* @__PURE__ */ new Set(["find", "fd", "fdfind", "bfs"]);
+var POWERSHELL_GLOB_COMMANDS = /* @__PURE__ */ new Set([
+  "get-childitem",
+  "gci",
+  "dir"
+]);
+var SHELL_WRAPPERS = /* @__PURE__ */ new Set([
+  "sudo",
+  "doas",
+  "env",
+  "command",
+  "time",
+  "builtin",
+  "nice",
+  "nohup"
+]);
 var SAFE_READ_TOOL_NAMES = /* @__PURE__ */ new Set([
   "mcp__safe_rw__safe_read",
   "safe_read"
@@ -105,8 +135,19 @@ function main() {
   }
   if (BUILTIN_SEARCH_TOOLS.has(toolName)) {
     deny(
-      "Built-in Search/Grep is disabled in this repository. Use mcp__safe_rw__safe_search for all content searches."
+      "Built-in Search/Grep/Glob is disabled in this repository. Use mcp__safe_rw__safe_search for searches."
     );
+    return;
+  }
+  if (SHELL_TOOLS.has(toolName)) {
+    const command = toolInput.command;
+    if (typeof command !== "string" || command.trim().length === 0) return;
+    const detected = detectShellSearch(command);
+    if (detected) {
+      deny(
+        `Shell search command "${detected}" is disabled in this repository. Use mcp__safe_rw__safe_search instead.`
+      );
+    }
     return;
   }
   if (isSafeFileToolName(toolName)) {
@@ -154,6 +195,96 @@ function getSafeToolName(toolName) {
     default:
       return "the corresponding safe tool";
   }
+}
+function detectShellSearch(command) {
+  for (const segment of splitShellSegments(command)) {
+    const tokens = tokenizeShellSegment(segment);
+    if (tokens.length === 0) continue;
+    const commandName = getShellCommandName(tokens);
+    if (!commandName) continue;
+    if (CONTENT_SEARCH_COMMANDS.has(commandName)) return commandName;
+    if (FILE_SEARCH_COMMANDS.has(commandName)) return commandName;
+    if (isGitGrep(commandName, tokens)) return "git grep";
+    if (isPowerShellRecursiveGlob(commandName, tokens)) return commandName;
+    if (containsExecutableSearchToken(commandName, tokens)) {
+      return "search command";
+    }
+    if (tokens.some((token) => isRecursiveGlobToken(token.value))) {
+      return "recursive glob";
+    }
+  }
+  return void 0;
+}
+function splitShellSegments(command) {
+  return command.replace(/\r?\n/g, ";").split(/&&|\|\||[;|]/).map((segment) => segment.trim()).filter(Boolean);
+}
+function tokenizeShellSegment(segment) {
+  const tokens = [];
+  const tokenPattern = /"([^"\\]*(?:\\.[^"\\]*)*)"|'([^']*)'|[^\s()<>]+/g;
+  for (const match of segment.matchAll(tokenPattern)) {
+    const raw = match[0];
+    const quoted = raw.startsWith('"') || raw.startsWith("'");
+    tokens.push({
+      value: quoted ? raw.slice(1, -1) : raw,
+      quoted
+    });
+  }
+  return tokens;
+}
+function getShellCommandName(tokens) {
+  let index = 0;
+  while (index < tokens.length) {
+    const token = tokens[index].value;
+    const name = normalizeCommandToken(token);
+    if (!name || isEnvAssignment(token)) {
+      index++;
+      continue;
+    }
+    if (SHELL_WRAPPERS.has(name)) {
+      index++;
+      while (index < tokens.length) {
+        const next = tokens[index].value;
+        if (isEnvAssignment(next) || next.startsWith("-")) {
+          index++;
+          continue;
+        }
+        break;
+      }
+      continue;
+    }
+    return name;
+  }
+  return void 0;
+}
+function containsExecutableSearchToken(commandName, tokens) {
+  if (commandName === "echo" || commandName === "printf") return false;
+  return tokens.some((token) => {
+    if (token.quoted) return false;
+    const name = normalizeCommandToken(token.value);
+    return CONTENT_SEARCH_COMMANDS.has(name) || FILE_SEARCH_COMMANDS.has(name);
+  });
+}
+function isGitGrep(commandName, tokens) {
+  return commandName === "git" && tokens.some((token) => normalizeCommandToken(token.value) === "grep");
+}
+function isPowerShellRecursiveGlob(commandName, tokens) {
+  if (!POWERSHELL_GLOB_COMMANDS.has(commandName)) return false;
+  return tokens.some((token) => {
+    const lower = token.value.toLowerCase();
+    return lower === "-recurse" || lower === "-r" || lower === "-filter" || lower === "-include" || lower === "-exclude";
+  });
+}
+function isRecursiveGlobToken(value) {
+  return value.includes("**/") || value.includes("**\\");
+}
+function isEnvAssignment(value) {
+  return /^[A-Za-z_][A-Za-z0-9_]*=/.test(value);
+}
+function normalizeCommandToken(value) {
+  const trimmed = value.trim().replace(/^["']|["']$/g, "");
+  if (!trimmed || trimmed.startsWith("-")) return "";
+  const base = trimmed.split(/[\\/]/).pop() ?? trimmed;
+  return base.replace(/\.(exe|cmd|bat|ps1)$/i, "").toLowerCase();
 }
 function readHookInput() {
   const raw = readFileSync(0, "utf8");
