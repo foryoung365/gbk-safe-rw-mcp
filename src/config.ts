@@ -12,6 +12,8 @@ export const DEFAULT_SAFE_EXTS = [
   '.inl',
   '.sql',
   '.proto',
+  '.patch',
+  '.diff',
 ]
 
 export const DEFAULT_SEARCH_EXCLUDE_DIRS = [

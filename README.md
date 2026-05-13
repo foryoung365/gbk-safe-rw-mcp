@@ -1,6 +1,6 @@
 # Safe Read/Write/Edit/Search MCP 使用说明
 
-本目录提供一个本地 stdio MCP 服务，用于在 Claude Code 中安全读写和搜索 GBK 编码的遗留 C/C++、SQL 与 Proto 文本文件。
+本目录提供一个本地 stdio MCP 服务，用于在 Claude Code 中安全读写和搜索 GBK 编码的遗留 C/C++、SQL、Proto、Patch 与 Diff 文本文件。
 
 它提供四个工具：
 
@@ -12,7 +12,7 @@
 默认受保护后缀为：
 
 ```text
-.c,.cc,.cpp,.cxx,.h,.hh,.hpp,.hxx,.inl,.sql,.proto
+.c,.cc,.cpp,.cxx,.h,.hh,.hpp,.hxx,.inl,.sql,.proto,.patch,.diff
 ```
 
 ## 基本机制
@@ -165,7 +165,7 @@ claude
         ".claude/mcp/gbk-safe-rw-mcp/dist/server.js"
       ],
       "env": {
-        "SAFE_RW_EXTS": ".c,.cc,.cpp,.cxx,.h,.hh,.hpp,.hxx,.inl,.sql,.proto",
+        "SAFE_RW_EXTS": ".c,.cc,.cpp,.cxx,.h,.hh,.hpp,.hxx,.inl,.sql,.proto,.patch,.diff",
         "SAFE_RW_SEARCH_EXCLUDE_DIRS": ".git,.svn,.hg,.bzr,.jj,.sl,build,build64,bin,obj,out,output,dist,target,Debug,Release,x64,x86,.vs,CMakeFiles,_ReSharper.Caches",
         "SAFE_RW_SEARCH_EXCLUDE_EXTS": ".exe,.dll,.lib,.pdb,.ilk,.obj,.o,.a,.so,.dylib,.pch,.idb,.ipch,.res,.exp,.map,.class,.jar,.zip,.7z,.rar,.png,.jpg,.jpeg,.gif",
         "SAFE_RW_SEARCH_MIRROR_CONCURRENCY": "8",
@@ -181,7 +181,7 @@ claude
 ```json
 {
   "env": {
-    "SAFE_RW_EXTS": ".c,.cc,.cpp,.cxx,.h,.hh,.hpp,.hxx,.inl,.sql,.proto",
+    "SAFE_RW_EXTS": ".c,.cc,.cpp,.cxx,.h,.hh,.hpp,.hxx,.inl,.sql,.proto,.patch,.diff",
     "SAFE_RW_SEARCH_EXCLUDE_DIRS": ".git,.svn,.hg,.bzr,.jj,.sl,build,build64,bin,obj,out,output,dist,target,Debug,Release,x64,x86,.vs,CMakeFiles,_ReSharper.Caches",
     "SAFE_RW_SEARCH_EXCLUDE_EXTS": ".exe,.dll,.lib,.pdb,.ilk,.obj,.o,.a,.so,.dylib,.pch,.idb,.ipch,.res,.exp,.map,.class,.jar,.zip,.7z,.rar,.png,.jpg,.jpeg,.gif",
     "SAFE_RW_SEARCH_MIRROR_CONCURRENCY": "8",
@@ -293,7 +293,7 @@ mcp__safe_rw__safe_search
 
 实际使用时只需向 agent 明确要求：
 
-- 读取 `.cpp`、`.h`、`.sql`、`.proto` 等受保护文件时使用 `safe_read`。
+- 读取 `.cpp`、`.h`、`.sql`、`.proto`、`.patch`、`.diff` 等受保护文件时使用 `safe_read`。
 - 局部修改这些文件时使用 `safe_edit`。
 - 完整覆盖写入这些文件时使用 `safe_write`。
 - 搜索任何文件内容或文件列表时使用 `safe_search`。
@@ -345,7 +345,7 @@ mcp__safe_rw__safe_search
 {
   "pattern": "中文注释|TODO",
   "path": "src",
-  "glob": "*.{cpp,h,proto}",
+  "glob": "*.{cpp,h,proto,patch,diff}",
   "output_mode": "content",
   "-C": 2,
   "-n": true,
@@ -359,7 +359,7 @@ mcp__safe_rw__safe_search
 
 只有 `pattern` 必填，其他参数均可省略。`safe_search` 会搜索全仓库文件，默认输出 `files_with_matches`；`output_mode: "content"` 返回匹配行，`output_mode: "count"` 返回各文件匹配计数。`glob`、`type`、`head_limit`、`offset`、上下文参数 `-A` / `-B` / `-C` / `context` 直接映射到 `ripgrep`，与内置 Search/Grep 保持同类语义。
 
-说明：`safe_search` 会优先走非 GBK 快速路径；无法明确排除受保护后缀时，会先用 `rg --files` 枚举候选文件，并按受保护后缀拆分为两路搜索。`.c/.cpp/.h/.sql/.proto` 等受保护文件会被解码为 UTF-8 临时镜像后再搜索；`.md/.json/.ts/.py/.pdf` 等非受保护文件不会复制到临时镜像，而是直接在原仓库中调用 `ripgrep` 搜索。候选文件已确定时，`safe_search` 会把文件列表分批传给 `ripgrep`，避免重复遍历整个仓库。受保护文件镜像支持有限并发与进程内磁盘缓存。最终两路结果会合并、排序、分页，并统一映射为仓库相对路径。
+说明：`safe_search` 会优先走非 GBK 快速路径；无法明确排除受保护后缀时，会先用 `rg --files` 枚举候选文件，并按受保护后缀拆分为两路搜索。`.c/.cpp/.h/.sql/.proto/.patch/.diff` 等受保护文件会被解码为 UTF-8 临时镜像后再搜索；`.md/.json/.ts/.py/.pdf` 等非受保护文件不会复制到临时镜像，而是直接在原仓库中调用 `ripgrep` 搜索。候选文件已确定时，`safe_search` 会把文件列表分批传给 `ripgrep`，避免重复遍历整个仓库。受保护文件镜像支持有限并发与进程内磁盘缓存。最终两路结果会合并、排序、分页，并统一映射为仓库相对路径。
 
 ## 编码规则
 
@@ -413,9 +413,9 @@ File has been modified since safe_read...
 ```markdown
 ## GBK 源码读写规则
 
-本仓库包含 GBK 编码的遗留 C/C++、SQL 与 Proto 文件。为避免中文注释乱码、搜索误判或破坏文件编码，处理以下后缀文件时必须使用 GBK 安全读写与搜索工具：
+本仓库包含 GBK 编码的遗留 C/C++、SQL、Proto、Patch 与 Diff 文件。为避免中文注释乱码、搜索误判或破坏文件编码，处理以下后缀文件时必须使用 GBK 安全读写与搜索工具：
 
-`.c`, `.cc`, `.cpp`, `.cxx`, `.h`, `.hh`, `.hpp`, `.hxx`, `.inl`, `.sql`, `.proto`
+`.c`, `.cc`, `.cpp`, `.cxx`, `.h`, `.hh`, `.hpp`, `.hxx`, `.inl`, `.sql`, `.proto`, `.patch`, `.diff`
 
 规则如下：
 

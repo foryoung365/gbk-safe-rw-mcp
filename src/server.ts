@@ -163,7 +163,7 @@ const SAFE_SEARCH_TOOL: Tool = {
       glob: {
         type: 'string',
         description:
-          'Glob pattern to filter files, e.g. "*.cpp", "*.{h,hpp}", "*.proto", or "*.md".',
+          'Glob pattern to filter files, e.g. "*.cpp", "*.{h,hpp}", "*.proto", "*.patch", "*.diff", or "*.md".',
       },
       output_mode: {
         type: 'string',
@@ -202,7 +202,7 @@ const SAFE_SEARCH_TOOL: Tool = {
       type: {
         type: 'string',
         description:
-          'File type to search, equivalent to rg --type. Safe aliases include c, cpp, h, sql, proto.',
+          'File type to search, equivalent to rg --type. Safe aliases include c, cpp, h, sql, proto, patch, diff.',
       },
       head_limit: {
         type: 'number',

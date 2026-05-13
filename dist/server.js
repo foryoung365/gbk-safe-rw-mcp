@@ -24632,7 +24632,9 @@ var DEFAULT_SAFE_EXTS = [
   ".hxx",
   ".inl",
   ".sql",
-  ".proto"
+  ".proto",
+  ".patch",
+  ".diff"
 ];
 var DEFAULT_SEARCH_EXCLUDE_DIRS = [
   ".git",
@@ -25079,7 +25081,9 @@ var SAFE_TYPE_ADDS = {
   hpp: ["*.hh", "*.hpp", "*.hxx"],
   sql: ["*.sql"],
   proto: ["*.proto"],
-  protobuf: ["*.proto"]
+  protobuf: ["*.proto"],
+  patch: ["*.patch", "*.diff"],
+  diff: ["*.diff", "*.patch"]
 };
 var KNOWN_NON_SAFE_TYPES = /* @__PURE__ */ new Set([
   "js",
@@ -26139,7 +26143,7 @@ function isNotFoundError(error2) {
 }
 
 // src/server.ts
-var SERVER_VERSION = true ? "0.1.15" : "0.1.0";
+var SERVER_VERSION = true ? "0.1.16" : "0.1.0";
 var SAFE_READ_TOOL = {
   name: "safe_read",
   description: "Read a configured GBK-safe text file. Decodes GBK or UTF-8 into UTF-8 text and returns numbered lines. Use this instead of Read for configured C/C++/SQL extensions.",
@@ -26243,7 +26247,7 @@ var SAFE_SEARCH_TOOL = {
       },
       glob: {
         type: "string",
-        description: 'Glob pattern to filter files, e.g. "*.cpp", "*.{h,hpp}", "*.proto", or "*.md".'
+        description: 'Glob pattern to filter files, e.g. "*.cpp", "*.{h,hpp}", "*.proto", "*.patch", "*.diff", or "*.md".'
       },
       output_mode: {
         type: "string",
@@ -26276,7 +26280,7 @@ var SAFE_SEARCH_TOOL = {
       },
       type: {
         type: "string",
-        description: "File type to search, equivalent to rg --type. Safe aliases include c, cpp, h, sql, proto."
+        description: "File type to search, equivalent to rg --type. Safe aliases include c, cpp, h, sql, proto, patch, diff."
       },
       head_limit: {
         type: "number",

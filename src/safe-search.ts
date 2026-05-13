@@ -86,6 +86,8 @@ const SAFE_TYPE_ADDS: Record<string, string[]> = {
   sql: ['*.sql'],
   proto: ['*.proto'],
   protobuf: ['*.proto'],
+  patch: ['*.patch', '*.diff'],
+  diff: ['*.diff', '*.patch'],
 }
 
 const KNOWN_NON_SAFE_TYPES = new Set([

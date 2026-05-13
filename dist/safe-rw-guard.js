@@ -17,7 +17,9 @@ var DEFAULT_SAFE_EXTS = [
   ".hxx",
   ".inl",
   ".sql",
-  ".proto"
+  ".proto",
+  ".patch",
+  ".diff"
 ];
 function parseSafeExts(raw = process.env.SAFE_RW_EXTS) {
   const values = raw?.split(/[,\s;]+/).map((item) => item.trim()).filter(Boolean) ?? DEFAULT_SAFE_EXTS;

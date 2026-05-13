@@ -12,7 +12,7 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const PACKAGE_NAME = 'safe-read-write-mcp'
-const SAFE_EXTS = '.c,.cc,.cpp,.cxx,.h,.hh,.hpp,.hxx,.inl,.sql,.proto'
+const SAFE_EXTS = '.c,.cc,.cpp,.cxx,.h,.hh,.hpp,.hxx,.inl,.sql,.proto,.patch,.diff'
 const SEARCH_EXCLUDE_DIRS = '.git,.svn,.hg,.bzr,.jj,.sl,build,build64,bin,obj,out,output,dist,target,Debug,Release,x64,x86,.vs,CMakeFiles,_ReSharper.Caches'
 const SEARCH_EXCLUDE_EXTS = '.exe,.dll,.lib,.pdb,.ilk,.obj,.o,.a,.so,.dylib,.pch,.idb,.ipch,.res,.exp,.map,.class,.jar,.zip,.7z,.rar,.png,.jpg,.jpeg,.gif'
 const MIRROR_CONCURRENCY = '8'
@@ -242,7 +242,7 @@ function releaseReadme(version) {
 
 版本：${version}
 
-本发布包用于在 Claude Code 中安全处理 GBK 编码的遗留 C/C++、SQL 与 Proto 文本文件。运行时不需要安装 npm 依赖，也不需要携带 \`node_modules\`；离线机器只需要安装 Node.js。
+本发布包用于在 Claude Code 中安全处理 GBK 编码的遗留 C/C++、SQL、Proto、Patch 与 Diff 文本文件。运行时不需要安装 npm 依赖，也不需要携带 \`node_modules\`；离线机器只需要安装 Node.js。
 
 \`safe_search\` 会调用真实 \`ripgrep\`，以尽量复用 Claude Code 内置 Search/Grep 的正则、glob、上下文和计数语义。当前发布包已内置 Windows x64 版 \`rg.exe\`：
 
