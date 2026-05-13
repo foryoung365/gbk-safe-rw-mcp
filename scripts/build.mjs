@@ -32,11 +32,17 @@ await Promise.all([
     entryPoints: ['src/safe-rw-guard.ts'],
     outfile: 'dist/safe-rw-guard.js',
   }),
+  build({
+    ...shared,
+    entryPoints: ['src/tool-loop-guard.ts'],
+    outfile: 'dist/tool-loop-guard.js',
+  }),
 ])
 
 await Promise.all([
   chmod('dist/server.js', 0o755),
   chmod('dist/safe-rw-guard.js', 0o755),
+  chmod('dist/tool-loop-guard.js', 0o755),
 ])
 
 if (existsSync('vendor/ripgrep')) {

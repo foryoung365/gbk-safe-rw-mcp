@@ -6,7 +6,7 @@
 
 - `safe_read`：读取目标后缀文件，自动将 GBK 或 UTF-8 解码为 UTF-8 文本返回给 agent。
 - `safe_write`：完整覆盖写入目标后缀文件，写入前将 UTF-8 内容转换回目标文件编码。
-- `safe_edit`：按精确字符串替换方式局部修改目标后缀文件，并保持原文件编码。
+- `safe_edit`：按接近 Claude Code 内置 `Edit` 的字符串替换语义局部修改目标后缀文件，并保持原文件编码。
 - `safe_search`：替代内置 Search/Grep 执行全仓库搜索；受保护后缀会先将 GBK 或 UTF-8 解码为 UTF-8 临时镜像，非受保护文件直接在原仓库中调用 `ripgrep` 匹配。
 
 默认受保护后缀为：
@@ -45,6 +45,7 @@ npm run build
 ```text
 I:/claude-code-source-code/safe-read-write-mcp/dist/server.js
 I:/claude-code-source-code/safe-read-write-mcp/dist/safe-rw-guard.js
+I:/claude-code-source-code/safe-read-write-mcp/dist/tool-loop-guard.js
 ```
 
 `safe_search` 依赖真实 `ripgrep` 来对齐 Claude Code 内置 Search/Grep 的行为。当前发布包已内置 Windows x64 版 `rg.exe`：
@@ -76,6 +77,7 @@ npm run build
 .claude/settings.json
 .claude/mcp/gbk-safe-rw-mcp/dist/server.js
 .claude/mcp/gbk-safe-rw-mcp/dist/safe-rw-guard.js
+.claude/mcp/gbk-safe-rw-mcp/dist/tool-loop-guard.js
 .claude/mcp/gbk-safe-rw-mcp/dist/vendor/ripgrep/win32/x64/rg.exe
 ```
 
@@ -183,11 +185,24 @@ claude
     "SAFE_RW_SEARCH_EXCLUDE_DIRS": ".git,.svn,.hg,.bzr,.jj,.sl,build,build64,bin,obj,out,output,dist,target,Debug,Release,x64,x86,.vs,CMakeFiles,_ReSharper.Caches",
     "SAFE_RW_SEARCH_EXCLUDE_EXTS": ".exe,.dll,.lib,.pdb,.ilk,.obj,.o,.a,.so,.dylib,.pch,.idb,.ipch,.res,.exp,.map,.class,.jar,.zip,.7z,.rar,.png,.jpg,.jpeg,.gif",
     "SAFE_RW_SEARCH_MIRROR_CONCURRENCY": "8",
-    "SAFE_RW_SEARCH_MIRROR_CACHE_MAX_FILES": "10000"
+    "SAFE_RW_SEARCH_MIRROR_CACHE_MAX_FILES": "10000",
+    "SAFE_RW_LOOP_GUARD_HISTORY_LIMIT": "5",
+    "SAFE_RW_LOOP_GUARD_REPEAT_THRESHOLD": "3"
   },
   "enabledMcpjsonServers": ["safe_rw"],
   "hooks": {
     "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/mcp/gbk-safe-rw-mcp/dist/tool-loop-guard.js",
+            "timeout": 5,
+            "statusMessage": "检查重复工具调用"
+          }
+        ]
+      },
       {
         "matcher": "Read|Write|Edit|Grep|Search|Glob|Bash|PowerShell",
         "hooks": [
@@ -246,6 +261,23 @@ claude
 
 镜像缓存使用系统临时目录保存 UTF-8 临时文件，内存中只保存路径、mtime、size 等索引信息。MCP 进程退出时会尽力清理缓存目录。
 
+## 重复工具调用保护
+
+本工具还提供一个独立的 `PreToolUse` Hook：
+
+```text
+.claude/mcp/gbk-safe-rw-mcp/dist/tool-loop-guard.js
+```
+
+该 Hook 会按 Claude Code 会话、当前工作目录以及 agent 标识分别记录最近工具调用的“工具名称 + 参数哈希”。它不会保存完整参数内容，只保存短哈希与时间戳。
+
+当同一个 agent 连续第 3 次准备执行完全相同的工具调用时，Hook 会在执行前拒绝本次调用，并提示 agent 查看前一次工具结果、调整参数或更换处理策略。提示中会尽力输出当前上下文长度与总长度限制；如果 Claude Code 的 Hook 输入或 transcript 中没有暴露该信息，则会明确说明不可用。
+
+可通过 `.claude/settings.json` 中的环境变量调整：
+
+- `SAFE_RW_LOOP_GUARD_HISTORY_LIMIT`：保留最近调用数量，默认 `5`。
+- `SAFE_RW_LOOP_GUARD_REPEAT_THRESHOLD`：连续相同调用拒绝阈值，默认 `3`。
+
 修改配置后，请重新启动 Claude Code；如果 `/mcp` 中仍显示 `safe_rw` 未启用，请在 `/mcp` 中批准该项目 MCP，或确认 `.claude/settings.json` 中存在 `"enabledMcpjsonServers": ["safe_rw"]`。
 
 ## 工具使用方式
@@ -303,7 +335,7 @@ mcp__safe_rw__safe_search
 }
 ```
 
-`safe_edit` 是局部修改工具，语义接近 Claude Code 内置 `Edit`：它会在当前文件中查找 `old_string` 并替换为 `new_string`。默认要求 `old_string` 在文件中唯一；如果需要替换所有匹配项，请设置 `replace_all: true`。
+`safe_edit` 是局部修改工具，语义接近 Claude Code 内置 `Edit`：它会在当前文件中查找 `old_string` 并替换为 `new_string`。默认要求 `old_string` 在文件中唯一；如果需要替换所有匹配项，请设置 `replace_all: true`。匹配时会兼容直引号/弯引号差异、Claude Code 常见脱敏字符串还原，并在删除整行文本时按内置 `Edit` 的方式处理尾随换行。
 
 对于已有非空文件，`safe_edit` 要求此前执行过 `safe_read`，但不要求完整读取；可以先使用 `offset` / `limit` 查看相关上下文，然后执行 `safe_edit`。如果文件在读取后被外部修改，且没有可用于确认内容未变化的完整读取快照，`safe_edit` 会拒绝写入并要求重新读取。
 
@@ -394,8 +426,9 @@ File has been modified since safe_read...
 - 可以使用 `offset` / `limit` 局部读取文件以查看上下文。
 - 写入已有文件前，必须先使用 `mcp__safe_rw__safe_read` 完整读取该文件，即不要带 `offset` 或 `limit`。
 - `mcp__safe_rw__safe_write` 是完整文件覆盖工具；写入时必须提供完整文件内容。
-- `mcp__safe_rw__safe_edit` 是精确字符串替换工具；默认要求 `old_string` 唯一，多处匹配时必须设置 `replace_all: true`。
+- `mcp__safe_rw__safe_edit` 是接近内置 `Edit` 的字符串替换工具；默认要求 `old_string` 唯一，多处匹配时必须设置 `replace_all: true`。
 - `mcp__safe_rw__safe_search` 对标内置 Search/Grep 参数，可搜索全仓库文件；受保护后缀会自动进行 GBK/UTF-8 转换。
 - 对非上述后缀文件，继续使用内置 `Read` / `Write` / `Edit`，但搜索仍必须使用 `mcp__safe_rw__safe_search`。
 - 如果 hook 阻止某次工具调用，应按错误提示改用对应工具，不要绕过该限制。
+- 如果重复工具调用保护阻止某次调用，说明最近连续多次使用了完全相同的工具名称与参数；必须先查看上一轮结果，调整参数或更换策略后再继续。
 ```

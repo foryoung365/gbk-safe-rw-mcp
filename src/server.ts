@@ -11,6 +11,12 @@ import {
 } from '@modelcontextprotocol/sdk/types.js'
 import { isSafeExtension } from './config.js'
 import {
+  applyEditToFile,
+  findActualString,
+  normalizeEditInput,
+  preserveQuoteStyle,
+} from './edit-utils.js'
+import {
   getFullReadState,
   getReadState,
   markRead,
@@ -106,7 +112,7 @@ const SAFE_WRITE_TOOL: Tool = {
 const SAFE_EDIT_TOOL: Tool = {
   name: 'safe_edit',
   description:
-    'Edit a configured GBK-safe text file by exact string replacement. Decodes GBK or UTF-8, applies old_string/new_string replacement, and writes back using the detected encoding.',
+    'Edit a configured GBK-safe text file with Claude Code Edit-like string replacement. Decodes GBK or UTF-8, applies old_string/new_string replacement with quote normalization, and writes back using the detected encoding.',
   inputSchema: {
     type: 'object',
     additionalProperties: false,
@@ -117,7 +123,7 @@ const SAFE_EDIT_TOOL: Tool = {
       },
       old_string: {
         type: 'string',
-        description: 'Exact UTF-8 text to replace. Use an empty string only to create a new file or fill an empty file.',
+        description: 'UTF-8 text to replace. Use an empty string only to create a new file or fill an empty file.',
       },
       new_string: {
         type: 'string',
@@ -452,9 +458,33 @@ async function safeEdit(args: SafeEditArgs): Promise<string> {
     if (current.content.length !== 0) {
       throw new Error('Cannot create new file - file already exists.')
     }
-    updatedContent = args.new_string
+    updatedContent = normalizeEditInput({
+      filePath: realPath,
+      fileContent: current.content,
+      oldString: args.old_string,
+      newString: args.new_string,
+    }).newString
   } else {
-    const matches = countOccurrences(current.content, args.old_string)
+    const normalizedInput = normalizeEditInput({
+      filePath: realPath,
+      fileContent: current.content,
+      oldString: args.old_string,
+      newString: args.new_string,
+    })
+    const actualOldString = findActualString(
+      current.content,
+      normalizedInput.oldString,
+    )
+    if (!actualOldString) {
+      throw new Error(`String to replace not found in file.\nString: ${args.old_string}`)
+    }
+
+    const actualNewString = preserveQuoteStyle(
+      normalizedInput.oldString,
+      actualOldString,
+      normalizedInput.newString,
+    )
+    const matches = countOccurrences(current.content, actualOldString)
     if (matches === 0) {
       throw new Error(`String to replace not found in file.\nString: ${args.old_string}`)
     }
@@ -464,9 +494,15 @@ async function safeEdit(args: SafeEditArgs): Promise<string> {
       )
     }
 
-    updatedContent = replaceAll
-      ? current.content.split(args.old_string).join(args.new_string)
-      : current.content.replace(args.old_string, args.new_string)
+    updatedContent = applyEditToFile(
+      current.content,
+      actualOldString,
+      actualNewString,
+      replaceAll,
+    )
+    if (updatedContent === current.content) {
+      throw new Error('Original and edited file match exactly. Failed to apply edit.')
+    }
   }
 
   const buffer = encodeText(

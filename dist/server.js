@@ -24730,6 +24730,168 @@ function clampInteger(raw, fallback, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
+// src/edit-utils.ts
+var LEFT_SINGLE_CURLY_QUOTE = "\u2018";
+var RIGHT_SINGLE_CURLY_QUOTE = "\u2019";
+var LEFT_DOUBLE_CURLY_QUOTE = "\u201C";
+var RIGHT_DOUBLE_CURLY_QUOTE = "\u201D";
+var DESANITIZATIONS = {
+  "<fnr>": "<function_results>",
+  "<n>": "<name>",
+  "</n>": "</name>",
+  "<o>": "<output>",
+  "</o>": "</output>",
+  "<e>": "<error>",
+  "</e>": "</error>",
+  "<s>": "<system>",
+  "</s>": "</system>",
+  "<r>": "<result>",
+  "</r>": "</result>",
+  "< META_START >": "<META_START>",
+  "< META_END >": "<META_END>",
+  "< EOT >": "<EOT>",
+  "< META >": "<META>",
+  "< SOS >": "<SOS>",
+  "\n\nH:": "\n\nHuman:",
+  "\n\nA:": "\n\nAssistant:"
+};
+function normalizeEditInput({
+  filePath,
+  fileContent,
+  oldString,
+  newString
+}) {
+  const normalizedNewString = isMarkdown(filePath) ? newString : stripTrailingWhitespace(newString);
+  if (fileContent.includes(oldString)) {
+    return {
+      oldString,
+      newString: normalizedNewString
+    };
+  }
+  const { result: desanitizedOldString, appliedReplacements } = desanitizeMatchString(oldString);
+  if (fileContent.includes(desanitizedOldString)) {
+    let desanitizedNewString = normalizedNewString;
+    for (const { from, to } of appliedReplacements) {
+      desanitizedNewString = desanitizedNewString.replaceAll(from, to);
+    }
+    return {
+      oldString: desanitizedOldString,
+      newString: desanitizedNewString
+    };
+  }
+  return {
+    oldString,
+    newString: normalizedNewString
+  };
+}
+function normalizeQuotes(value) {
+  return value.replaceAll(LEFT_SINGLE_CURLY_QUOTE, "'").replaceAll(RIGHT_SINGLE_CURLY_QUOTE, "'").replaceAll(LEFT_DOUBLE_CURLY_QUOTE, '"').replaceAll(RIGHT_DOUBLE_CURLY_QUOTE, '"');
+}
+function findActualString(fileContent, searchString) {
+  if (fileContent.includes(searchString)) {
+    return searchString;
+  }
+  const normalizedSearch = normalizeQuotes(searchString);
+  const normalizedFile = normalizeQuotes(fileContent);
+  const searchIndex = normalizedFile.indexOf(normalizedSearch);
+  if (searchIndex === -1) return null;
+  return fileContent.substring(searchIndex, searchIndex + searchString.length);
+}
+function preserveQuoteStyle(oldString, actualOldString, newString) {
+  if (oldString === actualOldString) {
+    return newString;
+  }
+  const hasDoubleQuotes = actualOldString.includes(LEFT_DOUBLE_CURLY_QUOTE) || actualOldString.includes(RIGHT_DOUBLE_CURLY_QUOTE);
+  const hasSingleQuotes = actualOldString.includes(LEFT_SINGLE_CURLY_QUOTE) || actualOldString.includes(RIGHT_SINGLE_CURLY_QUOTE);
+  if (!hasDoubleQuotes && !hasSingleQuotes) {
+    return newString;
+  }
+  let result = newString;
+  if (hasDoubleQuotes) {
+    result = applyCurlyDoubleQuotes(result);
+  }
+  if (hasSingleQuotes) {
+    result = applyCurlySingleQuotes(result);
+  }
+  return result;
+}
+function applyEditToFile(originalContent, oldString, newString, replaceAll = false) {
+  const replace = replaceAll ? (content, search, replacement) => content.replaceAll(search, () => replacement) : (content, search, replacement) => content.replace(search, () => replacement);
+  if (newString !== "") {
+    return replace(originalContent, oldString, newString);
+  }
+  const stripTrailingNewline = !oldString.endsWith("\n") && originalContent.includes(`${oldString}
+`);
+  return stripTrailingNewline ? replace(originalContent, `${oldString}
+`, newString) : replace(originalContent, oldString, newString);
+}
+function stripTrailingWhitespace(value) {
+  const parts = value.split(/(\r\n|\n|\r)/);
+  let result = "";
+  for (let index = 0; index < parts.length; index++) {
+    const part = parts[index];
+    if (part === void 0) continue;
+    result += index % 2 === 0 ? part.replace(/\s+$/, "") : part;
+  }
+  return result;
+}
+function desanitizeMatchString(matchString) {
+  let result = matchString;
+  const appliedReplacements = [];
+  for (const [from, to] of Object.entries(DESANITIZATIONS)) {
+    const beforeReplace = result;
+    result = result.replaceAll(from, to);
+    if (beforeReplace !== result) {
+      appliedReplacements.push({ from, to });
+    }
+  }
+  return { result, appliedReplacements };
+}
+function isMarkdown(filePath) {
+  return /\.(md|mdx)$/i.test(filePath);
+}
+function isOpeningContext(chars, index) {
+  if (index === 0) return true;
+  const previous = chars[index - 1];
+  return previous === " " || previous === "	" || previous === "\n" || previous === "\r" || previous === "(" || previous === "[" || previous === "{" || previous === "\u2014" || previous === "\u2013";
+}
+function applyCurlyDoubleQuotes(value) {
+  const chars = [...value];
+  const result = [];
+  for (let index = 0; index < chars.length; index++) {
+    if (chars[index] === '"') {
+      result.push(
+        isOpeningContext(chars, index) ? LEFT_DOUBLE_CURLY_QUOTE : RIGHT_DOUBLE_CURLY_QUOTE
+      );
+    } else {
+      result.push(chars[index]);
+    }
+  }
+  return result.join("");
+}
+function applyCurlySingleQuotes(value) {
+  const chars = [...value];
+  const result = [];
+  for (let index = 0; index < chars.length; index++) {
+    if (chars[index] !== "'") {
+      result.push(chars[index]);
+      continue;
+    }
+    const previous = index > 0 ? chars[index - 1] : void 0;
+    const next = index < chars.length - 1 ? chars[index + 1] : void 0;
+    const previousIsLetter = previous !== void 0 && new RegExp("\\p{L}", "u").test(previous);
+    const nextIsLetter = next !== void 0 && new RegExp("\\p{L}", "u").test(next);
+    if (previousIsLetter && nextIsLetter) {
+      result.push(RIGHT_SINGLE_CURLY_QUOTE);
+      continue;
+    }
+    result.push(
+      isOpeningContext(chars, index) ? LEFT_SINGLE_CURLY_QUOTE : RIGHT_SINGLE_CURLY_QUOTE
+    );
+  }
+  return result.join("");
+}
+
 // src/file-state.ts
 var readState = /* @__PURE__ */ new Map();
 function getReadState(realPath) {
@@ -25977,7 +26139,7 @@ function isNotFoundError(error2) {
 }
 
 // src/server.ts
-var SERVER_VERSION = true ? "0.1.13" : "0.1.0";
+var SERVER_VERSION = true ? "0.1.15" : "0.1.0";
 var SAFE_READ_TOOL = {
   name: "safe_read",
   description: "Read a configured GBK-safe text file. Decodes GBK or UTF-8 into UTF-8 text and returns numbered lines. Use this instead of Read for configured C/C++/SQL extensions.",
@@ -26034,7 +26196,7 @@ var SAFE_WRITE_TOOL = {
 };
 var SAFE_EDIT_TOOL = {
   name: "safe_edit",
-  description: "Edit a configured GBK-safe text file by exact string replacement. Decodes GBK or UTF-8, applies old_string/new_string replacement, and writes back using the detected encoding.",
+  description: "Edit a configured GBK-safe text file with Claude Code Edit-like string replacement. Decodes GBK or UTF-8, applies old_string/new_string replacement with quote normalization, and writes back using the detected encoding.",
   inputSchema: {
     type: "object",
     additionalProperties: false,
@@ -26045,7 +26207,7 @@ var SAFE_EDIT_TOOL = {
       },
       old_string: {
         type: "string",
-        description: "Exact UTF-8 text to replace. Use an empty string only to create a new file or fill an empty file."
+        description: "UTF-8 text to replace. Use an empty string only to create a new file or fill an empty file."
       },
       new_string: {
         type: "string",
@@ -26341,9 +26503,33 @@ async function safeEdit(args) {
     if (current.content.length !== 0) {
       throw new Error("Cannot create new file - file already exists.");
     }
-    updatedContent = args.new_string;
+    updatedContent = normalizeEditInput({
+      filePath: realPath,
+      fileContent: current.content,
+      oldString: args.old_string,
+      newString: args.new_string
+    }).newString;
   } else {
-    const matches = countOccurrences(current.content, args.old_string);
+    const normalizedInput = normalizeEditInput({
+      filePath: realPath,
+      fileContent: current.content,
+      oldString: args.old_string,
+      newString: args.new_string
+    });
+    const actualOldString = findActualString(
+      current.content,
+      normalizedInput.oldString
+    );
+    if (!actualOldString) {
+      throw new Error(`String to replace not found in file.
+String: ${args.old_string}`);
+    }
+    const actualNewString = preserveQuoteStyle(
+      normalizedInput.oldString,
+      actualOldString,
+      normalizedInput.newString
+    );
+    const matches = countOccurrences(current.content, actualOldString);
     if (matches === 0) {
       throw new Error(`String to replace not found in file.
 String: ${args.old_string}`);
@@ -26354,7 +26540,15 @@ String: ${args.old_string}`);
 String: ${args.old_string}`
       );
     }
-    updatedContent = replaceAll ? current.content.split(args.old_string).join(args.new_string) : current.content.replace(args.old_string, args.new_string);
+    updatedContent = applyEditToFile(
+      current.content,
+      actualOldString,
+      actualNewString,
+      replaceAll
+    );
+    if (updatedContent === current.content) {
+      throw new Error("Original and edited file match exactly. Failed to apply edit.");
+    }
   }
   const buffer = encodeText(
     updatedContent,
